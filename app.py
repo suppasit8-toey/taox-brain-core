@@ -20,89 +20,217 @@ st.set_page_config(
 # Custom CSS for Esports Vibe (Dark + Gold/Black + Red Alerts)
 st.markdown("""
 <style>
-    /* Main Background */
+    /* ========================================================================================= */
+    /* GLOBAL THEME: DARK VIOLET NEON */
+    /* ========================================================================================= */
+    
+    /* 1. Main Background & Global Text */
     .stApp {
-        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-        background-attachment: fixed;
-        color: #e0e0e0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #0a0a12; /* Deep Dark Void */
+        background-image: 
+            radial-gradient(circle at 10% 20%, rgba(106, 17, 203, 0.08) 0%, transparent 40%),
+            radial-gradient(circle at 90% 80%, rgba(37, 117, 252, 0.08) 0%, transparent 40%);
+        color: #ffffff;
+        font-family: 'Inter', 'Segoe UI', sans-serif;
     }
-    
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: rgba(10, 10, 20, 0.6);
-        backdrop-filter: blur(12px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    /* Headings */
-    h1, h2, h3, h4 {
+
+    h1, h2, h3, h4, h5, h6 {
         color: #ffffff !important;
-        text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); /* Neon Glow */
-        font-weight: 800;
-        letter-spacing: 1px;
-    }
-    
-    /* Subheadings */
-    .dashboard-subheader {
-        color: #00f2ff; /* Cyan */
-        font-size: 1.2rem;
-        font-weight: bold;
-        margin-top: 20px;
-        margin-bottom: 10px;
-        text-transform: uppercase;
-        text-shadow: 0 0 5px rgba(0, 242, 255, 0.3);
+        text-shadow: 0 0 20px rgba(106, 17, 203, 0.5); /* Soft Violet Glow */
+        font-weight: 700;
+        letter-spacing: 0.5px;
     }
 
-    /* Buttons (Glass Shards) */
-    .stButton > button {
-        background: linear-gradient(90deg, #00c6ff, #0072ff);
-        color: white;
-        border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-    }
-    .stButton > button:hover {
-        box-shadow: 0 0 20px rgba(0, 242, 255, 0.6);
-        transform: scale(1.02);
-    }
-
-    /* Inputs & Selects (Glass) */
-    .stTextInput > div > div > input, .stSelectbox > div > div > div, .stMultiSelect > div > div > div, .stNumberInput > div > div > input, .stTextArea > div > textarea {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white;
-        border-radius: 6px;
-    }
-    
-    /* Glass Card Class */
-    .glass-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 16px;
-        padding: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(8px);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-        margin-bottom: 20px;
-    }
-    
-    /* Highlight Text */
-    .highlight {
-        color: #00f2ff;
-        font-weight: bold;
+    /* 2. Containers / Cards (Glassy Violet) */
+    .glass-card, div[data-testid="stMetric"], div[data-testid="stExpander"], div[data-testid="stDataFrame"] {
+        background: rgba(20, 20, 32, 0.6);
+        border: 1px solid rgba(106, 17, 203, 0.2); /* Violet Border */
+        border-radius: 20px;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
     }
     
     /* Metric Value */
     [data-testid="stMetricValue"] {
-        color: #00f2ff !important;
-        text-shadow: 0 0 10px rgba(0, 242, 255, 0.4);
+        color: #e0b0ff !important; /* Light Violet */
+        text-shadow: 0 0 10px rgba(186, 84, 245, 0.6);
+    }
+
+    /* 3. Inputs & Selectboxes */
+    .stTextInput > div > div > input, 
+    .stSelectbox > div > div > div, 
+    .stMultiSelect > div > div > div, 
+    .stNumberInput > div > div > input, 
+    .stTextArea > div > textarea {
+        background-color: rgba(255, 255, 255, 0.03); 
+        color: #ffffff;
+        border: 1px solid rgba(106, 17, 203, 0.3);
+        border-radius: 12px;
     }
     
-    /* Table/DataFrame */
-    [data-testid="stDataFrame"] {
-        background-color: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+    .stTextInput > div > div > input:focus, 
+    .stSelectbox > div > div > div:focus-within {
+        border-color: #ba54f5; /* Neon Violet */
+        box-shadow: 0 0 15px rgba(186, 84, 245, 0.2);
+    }
+
+    /* 4. Buttons (Gradient & Plush) */
+    .stButton > button {
+        background: linear-gradient(135deg, #6a11cb, #2575fc);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(37, 117, 252, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        box-shadow: 0 0 25px rgba(106, 17, 203, 0.6);
+        transform: translateY(-2px);
+    }
+
+    /* ========================================================================================= */
+    /* DESKTOP SIDEBAR */
+    /* ========================================================================================= */
+    
+    section[data-testid="stSidebar"] {
+        background-color: rgba(10, 10, 18, 0.95); /* Deep dark */
+        border-right: 1px solid rgba(106, 17, 203, 0.1);
+    }
+    
+    /* Decoration on Desktop Sidebar */
+    section[data-testid="stSidebar"] h1 {
+        background: linear-gradient(to right, #ba54f5, #2575fc);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2rem;
+    }
+
+    /* Sidebar Radio Buttons -> Tabs/Pills look (Desktop) */
+    /* Note: These styles apply globally to radio buttons in sidebar unless mobile override kicks in */
+    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label {
+        padding: 10px 15px;
+        border-radius: 10px;
+        margin-bottom: 5px;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+    
+    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+        cursor: pointer;
+    }
+
+    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] {
+        background: linear-gradient(90deg, rgba(106, 17, 203, 0.3), transparent);
+        border-left: 4px solid #ba54f5;
+    }
+
+    /* ========================================================================================= */
+    /* MOBILE OPTIMIZATIONS (Max Width 768px) */
+    /* ========================================================================================= */
+    @media (max-width: 768px) {
+        
+        /* 1. Sidebar becomes Bottom Nav */
+        section[data-testid="stSidebar"] {
+            top: auto !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            min-width: 100% !important;
+            max-height: 80px; 
+            transform: none !important;
+            
+            background-color: #141420; 
+            border-top: 1px solid rgba(106, 17, 203, 0.5);
+            box-shadow: 0px -5px 25px rgba(0,0,0,0.7);
+            z-index: 10000;
+            
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+        }
+
+        /* Hide Top Controls & Extra Text */
+        div[data-testid="stSidebarCollapsedControl"], 
+        button[kind="header"],
+        section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"], 
+        section[data-testid="stSidebar"] h1, 
+        section[data-testid="stSidebar"] h2, 
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] hr {
+            display: none !important;
+        }
+        
+        /* Layout overrides for sidebar content */
+        section[data-testid="stSidebar"] .block-container {
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* 2. Radio -> Bottom Tabs */
+        /* Ensure specific targeting to override desktop styles */
+        section[data-testid="stSidebar"] .stRadio {
+            width: 100%;
+        }
+
+        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] {
+            display: flex !important;
+            flex-direction: row !important;
+            width: 100%;
+            justify-content: space-evenly;
+            gap: 2px;
+        }
+
+        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label {
+            flex: 1;
+            padding: 12px 5px !important; /* Increase touch target */
+            margin: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Hide radio circle */
+        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label > div:first-child {
+            display: none;
+        }
+
+        /* Nav Item Text */
+        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label p {
+            font-size: 0.75rem; 
+            margin: 0;
+            color: #888;
+        }
+
+        /* Active Tab Mobile */
+        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] {
+            border-bottom: 3px solid #ba54f5 !important;
+            border-left: none !important;
+        }
+        
+        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] p {
+            color: #ba54f5 !important;
+            font-weight: 700;
+            text-shadow: 0 0 8px rgba(186, 84, 245, 0.5);
+        }
+
+        /* 3. Push Main Content Up */
+        .main .block-container {
+            padding-bottom: 100px !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
