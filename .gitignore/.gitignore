@@ -1,0 +1,11 @@
+# ไฟล์ความลับ ห้ามเอาขึ้นเด็ดขาด!
+.streamlit/secrets.toml
+firebase_key.json
+*.json
+
+# โฟลเดอร์ระบบที่ไม่จำเป็น
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
