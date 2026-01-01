@@ -1,18 +1,18 @@
 import streamlit as st
 import pandas as pd
-import firebase_admin
-from firebase_admin import credentials, firestore
-import cloudinary
-import cloudinary.uploader
+from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
 import time
+import io
+import io
 import uuid
+import json
 
 # ==============================================================================
 # CONFIG & STYLE
 # ==============================================================================
 st.set_page_config(
-    page_title="TAOX Brain - Esports Manager",
+    page_title="second-brain-core",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -22,1129 +22,1704 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* ========================================================================================= */
-    /* GLOBAL THEME: DARK VIOLET NEON */
+    /* GLOBAL THEME: SKY PROTOCOL - FUTURISTIC GLASSMORPHISM */
     /* ========================================================================================= */
     
-    /* 1. Main Background & Global Text */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* 1. Global Typography & Reset */
+    html, body, .stApp {
+        font-family: 'Inter', sans-serif !important;
+    }
+
+    /* 2. Main Background (Deep Galaxy) */
     .stApp {
-        background-color: #0a0a12; /* Deep Dark Void */
-        background-image: 
-            radial-gradient(circle at 10% 20%, rgba(106, 17, 203, 0.08) 0%, transparent 40%),
-            radial-gradient(circle at 90% 80%, rgba(37, 117, 252, 0.08) 0%, transparent 40%);
+        background-color: #05010d;
+        background: radial-gradient(ellipse at 50% 0%, #2a0e45 0%, #0f051d 60%, #05010d 100%);
+        background-attachment: fixed;
         color: #ffffff;
-        font-family: 'Inter', 'Segoe UI', sans-serif;
     }
 
-    h1, h2, h3, h4, h5, h6 {
+    h1, h2, h3 {
         color: #ffffff !important;
-        text-shadow: 0 0 20px rgba(106, 17, 203, 0.5); /* Soft Violet Glow */
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-
-    /* 2. Containers / Cards (Glassy Violet) */
-    .glass-card, div[data-testid="stMetric"], div[data-testid="stExpander"], div[data-testid="stDataFrame"] {
-        background: rgba(20, 20, 32, 0.6);
-        border: 1px solid rgba(106, 17, 203, 0.2); /* Violet Border */
-        border-radius: 20px;
-        backdrop-filter: blur(12px);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-    }
-    
-    /* Metric Value */
-    [data-testid="stMetricValue"] {
-        color: #e0b0ff !important; /* Light Violet */
-        text-shadow: 0 0 10px rgba(186, 84, 245, 0.6);
-    }
-
-    /* 3. Inputs & Selectboxes */
-    .stTextInput > div > div > input, 
-    .stSelectbox > div > div > div, 
-    .stMultiSelect > div > div > div, 
-    .stNumberInput > div > div > input, 
-    .stTextArea > div > textarea {
-        background-color: rgba(255, 255, 255, 0.03); 
-        color: #ffffff;
-        border: 1px solid rgba(106, 17, 203, 0.3);
-        border-radius: 12px;
-    }
-    
-    .stTextInput > div > div > input:focus, 
-    .stSelectbox > div > div > div:focus-within {
-        border-color: #ba54f5; /* Neon Violet */
-        box-shadow: 0 0 15px rgba(186, 84, 245, 0.2);
-    }
-
-    /* 4. Buttons (Gradient & Plush) */
-    .stButton > button {
-        background: linear-gradient(135deg, #6a11cb, #2575fc);
-        color: white;
-        border: none;
-        border-radius: 12px;
-        padding: 0.5rem 1.5rem;
-        font-weight: 600;
-        box-shadow: 0 4px 15px rgba(37, 117, 252, 0.3);
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        box-shadow: 0 0 25px rgba(106, 17, 203, 0.6);
-        transform: translateY(-2px);
-    }
-
-    /* ========================================================================================= */
-    /* DESKTOP SIDEBAR */
-    /* ========================================================================================= */
-    
-    section[data-testid="stSidebar"] {
-        background-color: rgba(10, 10, 18, 0.95); /* Deep dark */
-        border-right: 1px solid rgba(106, 17, 203, 0.1);
-    }
-    
-    section[data-testid="stSidebar"] h1 {
-        background: linear-gradient(to right, #ba54f5, #2575fc);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 2rem;
-    }
-
-    /* Sidebar Radio Buttons -> Tabs/Pills look (Desktop) */
-    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label {
-        padding: 10px 15px;
-        border-radius: 10px;
-        margin-bottom: 5px;
-        border: 1px solid transparent;
-        transition: all 0.2s;
-    }
-    
-    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label:hover {
-        background-color: rgba(255, 255, 255, 0.05);
-        cursor: pointer;
-    }
-
-    section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] {
-        background: linear-gradient(90deg, rgba(106, 17, 203, 0.3), transparent);
-        border-left: 4px solid #ba54f5;
-    }
-
-    /* ========================================================================================= */
-    /* MOBILE OPTIMIZATIONS (Max Width 768px) - STRICT BOTTOM NAV */
-    /* ========================================================================================= */
-    @media (max-width: 768px) {
-        
-        /* 1. Hide Default Sidebar Elements & Header */
-        header[data-testid="stHeader"] {
-            display: none !important;
-        }
-
-        section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"], 
-        section[data-testid="stSidebar"] h1, 
-        section[data-testid="stSidebar"] h2, 
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] hr,
-        div[data-testid="stSidebarCollapsedControl"],
-        button[kind="header"] {
-            display: none !important;
-        }
-        
-        /* 2. Reposition & Style Sidebar Container */
-        section[data-testid="stSidebar"] {
-            top: auto !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            min-width: 100% !important;
-            
-            /* Layout */
-            display: flex !important;
-            flex-direction: row !important;
-            justify-content: center;
-            align-items: center;
-            
-            /* Styling */
-            background-color: rgba(10, 10, 18, 0.95);
-            border-top: 1px solid rgba(106, 17, 203, 0.3);
-            box-shadow: 0px -5px 20px rgba(0,0,0,0.5);
-            z-index: 999999;
-            padding: 5px 10px;
-        }
-
-        /* Layout overrides for internal sidebar wrappers to allow full width flex */
-        section[data-testid="stSidebar"] .block-container {
-            padding: 0 !important;
-            margin: 0 !important;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-        }
-
-        section[data-testid="stSidebar"] .stRadio {
-            width: 100%;
-        }
-
-        /* 3. Transform Radio Buttons into Navigation Tabs */
-        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] {
-            display: flex !important;
-            flex-direction: row !important;
-            width: 100%;
-            justify-content: space-around;
-            gap: 8px;
-            padding: 0;
-            margin: 0;
-        }
-
-        /* Hide Radio Circles */
-        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label > div:first-child {
-            display: none !important;
-        }
-
-        /* Style Navigation Items (Labels) */
-        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label {
-            flex-grow: 1;
-            text-align: center;
-            padding: 12px 5px !important;
-            margin: 0 !important;
-            background: transparent;
-            border: 1px solid transparent;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-        
-        /* Default Inactive Text */
-        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label p {
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #ccc;
-            margin: 0;
-        }
-
-        /* Active Tab Style */
-        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] {
-            background: linear-gradient(135deg, #6a11cb, #2575fc) !important;
-            box-shadow: 0 0 15px rgba(106, 17, 203, 0.6);
-            border: none;
-            border-radius: 12px;
-        }
-        
-        section[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label[data-checked="true"] p {
-            color: #ffffff !important;
-            font-weight: 700;
-        }
-
-        /* 4. Adjust Main Content Padding */
-        .main .block-container {
-            padding-bottom: 80px !important;
-        }
-    }
-    
-    /* 5. USER REQUESTED: GLASS CARD & TAGS */
-    .glass-card-hover {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(106, 17, 203, 0.3);
-        border-radius: 15px;
-        padding: 15px;
-        margin-bottom: 10px;
-        transition: transform 0.3s, border-color 0.3s;
-    }
-    .glass-card-hover:hover {
-        transform: translateY(-5px);
-        border-color: #aa22ff;
-        background-color: rgba(255, 255, 255, 0.08);
-    }
-    .role-tag {
-        display: inline-block;
-        background: rgba(106, 17, 203, 0.6);
-        border-radius: 10px;
-        padding: 2px 8px;
-        font-size: 0.8em;
-        margin-right: 5px;
-        margin-top: 5px;
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    /* 6. CLICKABLE GLASS CARD (Styled Button - Secondary) */
-    /* Target buttons that are NOT primary (default kind) */
-    .stButton > button[kind="secondary"] {
-        height: auto !important;
-        white-space: pre-wrap !important;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02)) !important;
-        backdrop-filter: blur(16px) saturate(180%) !important;
-        -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-        border: 1px solid rgba(138, 43, 226, 0.5) !important;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37) !important;
-        border-radius: 20px !important;
-        color: rgba(255, 255, 255, 0.9) !important;
-        text-align: left !important;
-        padding: 20px !important;
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
-        display: block !important;
-        width: 100% !important;
-        margin-bottom: 15px !important;
-    }
-    
-    .stButton > button[kind="secondary"]:hover {
-        transform: translateY(-5px) !important;
-        border-color: #00e5ff !important; /* Cyan glow on hover */
-        box-shadow: 0 15px 40px 0 rgba(31, 38, 135, 0.5) !important;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)) !important;
-    }
-    
-    /* 7. ADD NEW ITEM BUTTON (Primary) */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(90deg, #aa22ff, #6a11cb) !important;
-        border: none !important;
-        box-shadow: 0 4px 15px rgba(170, 34, 255, 0.4) !important;
-        font-size: 1.1rem !important;
-        padding: 0.8rem 2rem !important;
-        color: white !important;
-        width: 100% !important;
-        border-radius: 15px !important;
         font-weight: 700 !important;
+        letter-spacing: -0.5px;
+        text-shadow: 0 0 20px rgba(123, 44, 191, 0.6);
+    }
+    
+    p, label {
+        color: #b0a8c9 !important; /* Muted Lavender */
+    }
+
+    /* 3. Sidebar (Dark Frosted Glass) */
+    section[data-testid="stSidebar"] {
+        background-color: rgba(20, 10, 35, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(123, 44, 191, 0.2);
+        box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    }
+
+    /* 4. Glass Cards & Metrics (The Core Look) */
+    .glass-card, div[data-testid="stMetric"], div.block-container .stContainer, div.st-emotion-cache-1r6slb0 {
+        background: rgba(30, 15, 55, 0.6);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-radius: 24px;
+        border: 1px solid rgba(157, 78, 221, 0.3);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        padding: 24px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    div[data-testid="stMetric"]:hover, .glass-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(123, 44, 191, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        border-color: rgba(157, 78, 221, 0.8);
+    }
+
+    /* Metric Typography */
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.9rem !important;
+        color: #b0a8c9 !important;
+        font-weight: 500;
+        text-transform: uppercase;
         letter-spacing: 1px;
     }
-    
-    .stButton > button[kind="primary"]:hover {
-        box-shadow: 0 0 25px rgba(170, 34, 255, 0.7) !important;
-        transform: scale(1.02) !important;
+
+    div[data-testid="stMetricValue"] {
+        font-size: 2.2rem !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
     }
     
-    .stButton > button p {
-        font-size: 1rem !important;
+    div[data-testid="stMetricDelta"] {
+        background: #1e0f37;
+        padding: 4px 10px;
+        border-radius: 10px;
+        font-weight: 600;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* 5. Buttons (Neon Gradient) */
+    .stButton > button {
+        background: linear-gradient(90deg, #7b2cbf 0%, #b5179e 100%) !important;
+        border: none !important;
+        border-radius: 12px !important;
+        color: white !important;
+        font-weight: 600 !important;
+        padding: 0.6rem 1.5rem !important;
+        box-shadow: 0 4px 15px rgba(123, 44, 191, 0.5) !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(181, 23, 158, 0.7) !important;
+        filter: brightness(1.2);
+    }
+    
+    /* Secondary/Glass Button */
+    .stButton > button[kind="secondary"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(157, 78, 221, 0.4) !important;
+        box-shadow: none !important;
+    }
+
+    /* 6. Inputs (Futuristic form fields) */
+    .stTextInput > div > div > input, .stSelectbox > div > div > div {
+        background: rgba(15, 5, 29, 0.8) !important;
+        border: 1px solid #4a2b7a !important;
+        color: white !important;
+        border-radius: 12px !important;
+        }
+    .stTextInput > div > div > input:focus, .stSelectbox > div > div > div:focus-within {
+        border-color: #b5179e !important;
+        box-shadow: 0 0 15px rgba(181, 23, 158, 0.3) !important;
+    }
+
+    /* 7. FAB (Floating Action Button) from previous task - refined */
+    div[data-testid="stButton"] > button[kind="primary"] {
+        width: 60px !important;
+        height: 60px !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 25px rgba(247, 37, 133, 0.6) !important;
+    }
+
+    /* Mobile overrides */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 2rem !important;
+        }
+        div[data-testid="stMetric"] {
+            margin-bottom: 10px;
+        }
+    }
+    /* Hero Card (Holographic/Cyberpunk Theme) */
+    div[data-testid="stButton"] button.hero-card-btn {
+        height: auto !important;
+        white-space: pre-wrap !important;
+        background: linear-gradient(135deg, rgba(30, 15, 55, 0.9), rgba(10, 5, 20, 0.95)) !important;
+        border: 1px solid rgba(157, 78, 221, 0.3) !important;
+        border-radius: 16px !important;
+        text-align: left !important;
+        padding: 16px !important;
+        width: 100% !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* Hero Card (Minimalist Image-First Theme) */
+    div[data-testid="stButton"] button.hero-card-btn {
+        aspect-ratio: 3/4 !important;
+        background: linear-gradient(135deg, #2c3e50, #000000) !important; /* Fallback */
+        border: 1px solid #333 !important;
+        border-radius: 15px !important;
+        padding: 10px !important;
+        width: 100% !important;
+        
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-end !important; /* Text at bottom */
+        align-items: center !important; /* Text centered */
+        
+        position: relative !important;
+        overflow: hidden !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5) !important;
+    }
+
+    /* Make the Markdown Image behave like a Background Image */
+    div[data-testid="stButton"] button.hero-card-btn img {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        opacity: 0.7 !important; /* Dim image slightly so text pops */
+        transition: opacity 0.3s ease, transform 0.5s ease !important;
+        z-index: 1 !important;
+    }
+    
+    /* Text Container (The paragraph inside button) */
+    div[data-testid="stButton"] button.hero-card-btn p {
+        position: relative !important;
+        z-index: 2 !important;
+        font-family: 'Inter', sans-serif !important;
+        text-align: center !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding-bottom: 5px !important;
+        
+        /* Gradient Overlay effect for readability at bottom */
+        text-shadow: 0 2px 4px rgba(0,0,0,0.9) !important;
+    }
+
+    /* HEADER (Name) Styling via CSS ::first-line */
+    div[data-testid="stButton"] button.hero-card-btn p::first-line {
+        font-size: 1.4rem !important;
+        font-weight: 900 !important;
+        color: #ffffff !important;
+        line-height: 1.2 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+    }
+
+    /* HOVER EFFECT */
+    div[data-testid="stButton"] button.hero-card-btn:hover {
+        transform: translateY(-5px) !important;
+        box-shadow: 0 15px 30px rgba(0,0,0,0.6) !important;
+        border-color: #aa22ff !important;
+    }
+    
+    div[data-testid="stButton"] button.hero-card-btn:hover img {
+        opacity: 0.9 !important; /* Brighten image on hover */
+        transform: scale(1.05) !important; /* Subtle zoom */
     }
 </style>
-""", unsafe_allow_html=True)
+""",unsafe_allow_html=True)
 
 # ==============================================================================
-# BACKEND INITIALIZATION (SAFE MODE)
+# BACKEND: GOOGLE SHEETS DB MANAGER
 # ==============================================================================
 
-@st.cache_resource
-def init_firebase():
+@st.cache_data(ttl=3600)
+def _fetch_versions_cached():
     try:
-        if not firebase_admin._apps:
-            cred_dict = dict(st.secrets["firebase"])
-            cred = credentials.Certificate(cred_dict)
-            firebase_admin.initialize_app(cred)
-        return firestore.client()
-    except:
-        return None
-
-@st.cache_resource
-def init_cloudinary():
-    try:
-        c_config = st.secrets["cloudinary"]
-        cloudinary.config(
-            cloud_name=c_config["cloud_name"],
-            api_key=c_config["api_key"],
-            api_secret=c_config["api_secret"]
-        )
-        return True
-    except:
-        return False
-
-db = init_firebase()
-cloud_ready = init_cloudinary()
-
-# ==============================================================================
-# DATA CONTROLLERS & MODELS
-# ==============================================================================
-
-def get_versions():
-    if not db: return []
-    docs = db.collection('versions').order_by('created_at', direction=firestore.Query.DESCENDING).stream()
-    return [{"id": d.id, **d.to_dict()} for d in docs]
-
-def get_heroes(version_id):
-    if not db or not version_id: return pd.DataFrame()
-    hero_ref = db.collection('heroes').where('version_id', '==', version_id)
-    docs = hero_ref.stream()
-    data = []
-    for doc in docs:
-        d = doc.to_dict()
-        d['id'] = doc.id
-        data.append(d)
-    return pd.DataFrame(data)
-
-def get_combos(version_id):
-    if not db or not version_id: return []
-    docs = db.collection('combos').where('version_id', '==', version_id).stream()
-    return [{"id": d.id, **d.to_dict()} for d in docs]
-
-def get_teams():
-    if not db: return []
-    docs = db.collection('teams').stream()
-    return [{"id": d.id, **d.to_dict()} for d in docs]
-
-def get_players():
-    if not db: return []
-    docs = db.collection('players').order_by('ign').stream()
-    return [{"id": d.id, **d.to_dict()} for d in docs]
-
-def init_session_state():
-    if 'players' not in st.session_state:
-        st.session_state['players'] = []
-    if 'teams' not in st.session_state:
-        st.session_state['teams'] = []
-
-def save_player(name, roles):
-    if not db: return None
-    person_doc = {
-        "ign": name,
-        "roles": roles,
-        "current_team_id": None,
-        "created_at": datetime.now()
-    }
-    doc_ref = db.collection('players').add(person_doc)
-    new_player = {"id": doc_ref[1].id, **person_doc}
-    if 'players' in st.session_state:
-        st.session_state['players'].append(new_player)
-    return new_player
-
-def save_team(name, coach_id, roster_dict):
-    if not db: return None
-    team_doc = {
-        "name": name,
-        "coach_id": coach_id,
-        "roster": roster_dict,
-        "created_at": datetime.now()
-    }
-    doc_ref = db.collection('teams').add(team_doc)
-    new_team = {"id": doc_ref[1].id, **team_doc}
-    if 'teams' in st.session_state:
-        st.session_state['teams'].append(new_team)
-    return new_team
-
-def clone_version(source_version_id, new_version_name):
-    if not db: return False
-    
-    # 1. Create New Version
-    new_version_ref = db.collection('versions').document()
-    new_version_id = new_version_ref.id
-    new_version_ref.set({
-        "name": new_version_name,
-        "created_at": datetime.now(),
-        "is_active": True
-    })
-    
-    # 2. Clone Heroes
-    source_heroes = db.collection('heroes').where('version_id', '==', source_version_id).stream()
-    batch = db.batch()
-    count = 0
-    for h in source_heroes:
-        data = h.to_dict()
-        data['version_id'] = new_version_id # Retarget
-        new_ref = db.collection('heroes').document()
-        batch.set(new_ref, data)
-        count += 1
-        if count >= 400: # Firestore batch limit
-            batch.commit()
-            batch = db.batch()
-            count = 0
-    batch.commit()
-    
-    # 3. Clone Combos
-    source_combos = db.collection('combos').where('version_id', '==', source_version_id).stream()
-    batch_c = db.batch()
-    count_c = 0
-    for c in source_combos:
-        data = c.to_dict()
-        data['version_id'] = new_version_id
-        new_ref = db.collection('combos').document()
-        batch_c.set(new_ref, data)
-        count_c += 1
-        if count_c >= 400:
-            batch_c.commit()
-            batch_c = db.batch()
-            count_c = 0
-    batch_c.commit()
-    
-    return True
-
-
-
-# ==============================================================================
-# DIALOGS (MUST BE DEFINED AT TOP LEVEL)
-# ==============================================================================
-
-@st.dialog("✏️ Edit Person Profile")
-def edit_player_dialog(player):
-    with st.form("edit_p_form"):
-        new_name = st.text_input("IGN", value=player['ign'])
-        # Updated Roles: 'Support' merged into 'Roam'
-        new_roles = st.multiselect("Roles", 
-                                  ['Dark Slayer', 'Jungle', 'Mid', 'Abyssal', 'Roam', 'Coach'],
-                                  default=player.get('roles', []))
+        conn = st.connection("gsheets", type=GSheetsConnection)
+        url = st.secrets["connections"]["gsheets"]["spreadsheet"]
         
-        if st.form_submit_button("Save Changes"):
-            db.collection('players').document(player['id']).update({
-                "ign": new_name,
-                "roles": new_roles
-            })
-            # Update session state manually to reflect changes immediately
-            for p in st.session_state['players']:
-                if p['id'] == player['id']:
-                    p['ign'] = new_name
-                    p['roles'] = new_roles
-                    break
-            st.success("Updated!")
-            time.sleep(0.5)
-            st.rerun()
-            st.success("Updated!")
-            time.sleep(0.5)
-            st.rerun()
+        # Robust Client Access
+        instance = conn._instance
+        gspread_client = None
+        if hasattr(instance, "client"):
+            gspread_client = instance.client
+        elif hasattr(instance, "_client"):
+            gspread_client = instance._client
+        elif hasattr(instance, "service_account"):
+            gspread_client = instance.service_account
+        
+        client = gspread_client if gspread_client else instance
+        
+        sh = client.open_by_url(url)
+        return [ws.title for ws in sh.worksheets()]
+    except Exception:
+        return ["VERSION 1.60.1.10"]
 
-@st.dialog("➕ Add New Person")
-def register_player_dialog():
-    with st.form("f_reg_person_dialog"):
-        p_ign = st.text_input("Person Name / IGN")
-        # Updated Roles: 'Support' merged into 'Roam'
-        p_roles = st.multiselect("Role Selection", 
-                                ['Dark Slayer', 'Jungle', 'Mid', 'Abyssal', 'Roam', 'Coach'])
-        if st.form_submit_button("Save Person"):
-            if p_ign and p_roles:
-                save_player(p_ign, p_roles)
-                st.success(f"Registered {p_ign}!")
-                time.sleep(0.5)
-                st.rerun()
+class DBManager:
+    def __init__(self):
+        # Initialize the GSheets connection
+        self.conn = st.connection("gsheets", type=GSheetsConnection)
+
+    def _get_spreadsheet(self):
+        try:
+            url = st.secrets["connections"]["gsheets"]["spreadsheet"]
+            # Step 1: Access the internal instance
+            instance = self.conn._instance
+            
+            # Step 2: Try to find the gspread client using the most common internal paths
+            gspread_client = None
+            if hasattr(instance, "client"):
+                gspread_client = instance.client
+            elif hasattr(instance, "_client"):
+                gspread_client = instance._client
+            elif hasattr(instance, "service_account"):
+                gspread_client = instance.service_account
+            
+            # Step 3: If a client is found, use it to open the URL. 
+            # Otherwise, try calling open_by_url on the instance directly as a last resort.
+            if gspread_client:
+                return gspread_client.open_by_url(url)
             else:
-                st.error("Name and Roles are required.")
-
-@st.dialog("➕ Create New Team")
-def create_team_dialog():
-    with st.form("f_reg_team_dialog"):
-        t_name = st.text_input("Team Name")
-        if st.form_submit_button("Create Team"):
-            if t_name:
-                empty_roster = {k: None for k in ["Dark Slayer", "Jungle", "Mid", "Abyssal", "Roam", "Sub 1", "Sub 2"]}
-                save_team(t_name, None, empty_roster)
-                st.success(f"Team '{t_name}' created!")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error("Name is required.")
-
-@st.dialog("🛡️ Manage Team Roster")
-def manage_roster_dialog(team):
-    st.caption(f"Editing Roster for: {team['name']}")
-    
-    # 1. Prepare Data & Helpers (Reusing logic for strict filtering)
-    all_p = st.session_state['players']
-    t_lookup = {t['id']: t['name'] for t in st.session_state['teams']}
-    
-    def get_options(role_filter=None):
-        opts = {"None": None}
-        for p in all_p:
-            if role_filter:
-                player_roles = p.get('roles', [])
-                if role_filter == "Roam":
-                    if "Roam" not in player_roles and "Support" not in player_roles: continue
-                else:
-                    if role_filter not in player_roles: continue
-            
-            status = t_lookup.get(p.get('current_team_id'), "Free Agent")
-            if p.get('current_team_id') == team['id']: status = "CURRENT"
-            label = f"{p['ign']} ({'/'.join(p.get('roles', []))}) - {status}"
-            opts[label] = p['id']
-        return opts
-
-    def get_idx_in(pid, options_dict):
-        if not pid: return 0
-        for i, (l, v) in enumerate(options_dict.items()):
-            if v == pid: return i
-        return 0
-
-    opt_coach = get_options("Coach")
-    opt_dsl = get_options("Dark Slayer")
-    opt_jgl = get_options("Jungle")
-    opt_mid = get_options("Mid")
-    opt_aby = get_options("Abyssal")
-    opt_roam = get_options("Roam")
-    opt_all = get_options(None)
-
-    curr_r = team.get('roster', {})
-    
-    with st.form("dialog_roster_form"):
-        st.markdown("#### 🧠 Coaching Staff")
-        new_coach = st.selectbox("Head Coach", list(opt_coach.keys()), index=get_idx_in(team.get('coach_id'), opt_coach), key="d_coach")
-        
-        st.markdown("#### ⚔️ Main Roster")
-        c1, c2 = st.columns(2)
-        ndsl = c1.selectbox("Dark Slayer", list(opt_dsl.keys()), index=get_idx_in(curr_r.get("Dark Slayer"), opt_dsl), key="d_dsl")
-        njgl = c2.selectbox("Jungle", list(opt_jgl.keys()), index=get_idx_in(curr_r.get("Jungle"), opt_jgl), key="d_jgl")
-        
-        c3, c4 = st.columns(2)
-        nmid = c3.selectbox("Mid", list(opt_mid.keys()), index=get_idx_in(curr_r.get("Mid"), opt_mid), key="d_mid")
-        naby = c4.selectbox("Abyssal", list(opt_aby.keys()), index=get_idx_in(curr_r.get("Abyssal"), opt_aby), key="d_aby")
-        
-        nroam = st.selectbox("Roam (Support)", list(opt_roam.keys()), index=get_idx_in(curr_r.get("Roam"), opt_roam), key="d_roam")
-        
-        st.markdown("#### 🔄 Substitutes")
-        s1, s2 = st.columns(2)
-        nsub1 = s1.selectbox("Sub 1", list(opt_all.keys()), index=get_idx_in(curr_r.get("Sub 1"), opt_all), key="d_sub1")
-        nsub2 = s2.selectbox("Sub 2", list(opt_all.keys()), index=get_idx_in(curr_r.get("Sub 2"), opt_all), key="d_sub2")
-        
-        if st.form_submit_button("💾 Save Roster Configuration"):
-            updated_r = {
-                "Dark Slayer": opt_dsl[ndsl], "Jungle": opt_jgl[njgl], "Mid": opt_mid[nmid],
-                "Abyssal": opt_aby[naby], "Roam": opt_roam[nroam],
-                "Sub 1": opt_all[nsub1], "Sub 2": opt_all[nsub2]
-            }
-            new_coach_id = opt_coach[new_coach]
-            
-            batch = db.batch()
-            t_ref = db.collection('teams').document(team['id'])
-            
-            # 1. Update Team
-            batch.update(t_ref, {"roster": updated_r, "coach_id": new_coach_id})
-            
-            # 2. Reset Old Players
-            for p in db.collection('players').where('current_team_id', '==', team['id']).stream():
-                batch.update(p.reference, {"current_team_id": None})
+                return instance.open_by_url(url)
                 
-            # 3. Set New Players
-            new_ids = [val for val in updated_r.values() if val]
-            if new_coach_id: new_ids.append(new_coach_id)
-            for pid in set(new_ids):
-                batch.update(db.collection('players').document(pid), {"current_team_id": team['id']})
+        except Exception as e:
+            st.error(f"❌ Connection Failure: {e}")
+            return None
+
+    def get_all_versions(self):
+        """Return a list of all worksheet titles (Versions)."""
+        return _fetch_versions_cached()
+
+    def create_version(self, new_version_name, clone_from_version=None):
+        """
+        Create a new worksheet (version).
+        If clone_from_version is 'Empty' or None, create a fresh sheet with headers.
+        Otherwise, duplicate the source sheet.
+        """
+        try:
+            sh = self._get_spreadsheet()
+            if sh is None:
+                st.error("Cannot connect to Spreadsheet.")
+                return False
             
-            batch.commit()
+            # Check if exists
+            existing_titles = [ws.title for ws in sh.worksheets()]
+            if new_version_name in existing_titles:
+                st.error(f"Version '{new_version_name}' already exists!")
+                return False
             
-            # Sync Session State
-            st.session_state['teams'] = get_teams()
-            st.session_state['players'] = get_players()
+            if clone_from_version and clone_from_version != "Empty" and clone_from_version in existing_titles:
+                # Clone Logic
+                source_ws = sh.worksheet(clone_from_version)
+                source_ws.duplicate(new_sheet_name=new_version_name)
+            else:
+                # Create Empty Logic
+                new_ws = sh.add_worksheet(title=new_version_name, rows=100, cols=20)
+                # CRITICAL: Write Headers immediately
+                headers = ["name", "tier", "class", "position", "timing", "counters", "id", "image_url", "matchups"]
+                new_ws.append_row(headers)
             
-            st.success("Roster Saved!")
-            time.sleep(0.5)
+            # Clear cache to reflect new sheet
+            st.cache_data.clear()
+            return True
+
+        except Exception as e:
+            st.error(f"Failed to create version: {e}")
+            return False
+
+    def load_heroes(self, version_name="VERSION 1.60.1.10"):
+        """Load heroes from the specified worksheet (version)."""
+        try:
+            # Read DataFrame using streamlit_gsheets with TTL cache
+            df = self.conn.read(worksheet=version_name, ttl=3600)
+            
+            # Data Cleaning
+            if df.empty:
+                return pd.DataFrame(columns=["name", "tier", "class", "position", "timing", "counters", "id", "image_url", "matchups"])
+            
+            # 1. Drop rows with empty names (garbage data)
+            if 'name' in df.columns:
+                df = df.dropna(subset=['name'])
+                df = df[df['name'].astype(str).str.strip() != '']
+            
+            # Handle NaN
+            df = df.fillna("")
+            
+            # 2. Critical: Ensure Unique IDs
+            # If 'id' column missing, create it
+            if 'id' not in df.columns:
+                df['id'] = [str(uuid.uuid4()) for _ in range(len(df))]
+                need_save = True
+            else:
+                # Convert to string and strip
+                df['id'] = df['id'].astype(str).str.strip()
+                pass
+
+            # Detect duplicates or empty IDs
+            seen_ids = set()
+            need_save = False
+            
+            # Iterate and fix IDs in memory
+            # We use a list to reconstruct the column to avoid index issues during iteration
+            new_ids = []
+            for idx, row in df.iterrows():
+                row_id = row.get('id', '')
+                
+                # Check if invalid: empty, 'nan', or duplicate
+                if not row_id or row_id.lower() == 'nan' or row_id in seen_ids:
+                    # Generate new ID
+                    new_id = str(uuid.uuid4())
+                    new_ids.append(new_id)
+                    seen_ids.add(new_id)
+                    need_save = True
+                else:
+                    new_ids.append(row_id)
+                    seen_ids.add(row_id)
+            
+            df['id'] = new_ids
+
+            # Convert string representations of lists to actual lists if needed
+            # (Assuming simple comma separation for storage simplicity in Sheets or manual entry)
+            # If using JSON string storage:
+            # df['counters'] = df['counters'].apply(lambda x: json.loads(x) if x else [])
+            # For this simplified version, let's assume comma-separated strings for 'counters' and 'position' in loose usage,
+            # BUT the previous code expected lists. Let's standadize:
+            
+            # 'counters': "HeroA, HeroB" -> ["HeroA", "HeroB"]
+            if 'counters' in df.columns:
+                 df['counters'] = df['counters'].astype(str).apply(
+                     lambda x: [i.strip() for i in x.split(',')] if x.strip() else []
+                 )
+            
+            # 'position': "Mid, Jungle" -> ["Mid", "Jungle"]
+            if 'position' in df.columns:
+                 df['position'] = df['position'].astype(str).apply(
+                     lambda x: [i.strip() for i in x.split(',')] if x.strip() else []
+                 )
+
+            # 'matchups': JSON String -> List of Dicts
+            if 'matchups' in df.columns:
+                def parse_matchups(x):
+                    try:
+                        return json.loads(str(x)) if x and str(x).strip() else []
+                    except:
+                        return []
+                df['matchups'] = df['matchups'].apply(parse_matchups)
+            else:
+                 df['matchups'] = [[] for _ in range(len(df))]
+            
+            # 3. Persist corrected IDs back to Sheet if changes were made
+            if need_save:
+                 # We need to perform a save operation without triggering infinite recursion or major overhead
+                 # We reuse the logic from save_hero/update but for the whole DF
+                 try:
+                     output_df = df.copy()
+                     for col in ['counters', 'position']:
+                        if col in output_df.columns:
+                             output_df[col] = output_df[col].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
+                     
+                     if 'matchups' in output_df.columns:
+                          output_df['matchups'] = output_df['matchups'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+                     
+                     self.conn.update(worksheet=version_name, data=output_df)
+                     st.cache_data.clear() # Clear cache so next load gets the clean sheet
+                 except Exception as e:
+                     print(f"Auto-fix IDs save failed: {e}") # Log but don't crash app
+
+            return df
+        except Exception as e:
+            # st.error(f"Error loading heroes from {version_name}: {e}")
+            return pd.DataFrame()
+
+    def load_matchups(self, hero_name, version_name):
+        """
+        Loads matchups for a specific hero from the 'matchups' worksheet, filtered by version.
+        """
+        try:
+            try:
+                df = self.conn.read(worksheet="matchups")
+            except:
+                return []
+            
+            if df.empty or 'hero' not in df.columns or 'version' not in df.columns:
+                return []
+            
+            # Filter by Hero AND Version
+            matches = df[
+                (df['hero'] == hero_name) & 
+                (df['version'] == version_name)
+            ].to_dict('records')
+            
+            return matches
+        except Exception as e:
+            # st.error(f"Error loading matchups: {e}") # Silent fail or log
+            return []
+
+    def add_matchup(self, hero_name, lane, opponent_name, win_rate, version_name):
+        """
+        Adds a bi-directional matchup to the 'matchups' sheet for a specific version.
+        """
+        try:
+            try:
+                df = self.conn.read(worksheet="matchups")
+            except:
+                # Create empty DF if sheet doesn't exist
+                df = pd.DataFrame(columns=['hero', 'lane', 'opponent', 'win_rate', 'version'])
+
+            # Ensure columns
+            required_cols = ['hero', 'lane', 'opponent', 'win_rate', 'version']
+            for col in required_cols:
+                if col not in df.columns:
+                    df[col] = "" # Add missing cols
+
+            # Prepare new rows
+            row1 = {"hero": hero_name, "lane": lane, "opponent": opponent_name, "win_rate": win_rate, "version": version_name}
+            
+            # Reverse logic
+            rev_wr = 100 - int(win_rate)
+            row2 = {"hero": opponent_name, "lane": lane, "opponent": hero_name, "win_rate": rev_wr, "version": version_name}
+            
+            # DELETE collisions first (Update behavior) for THIS VERSION
+            c1 = (df['hero'] == hero_name) & (df['opponent'] == opponent_name) & (df['lane'] == lane) & (df['version'] == version_name)
+            c2 = (df['hero'] == opponent_name) & (df['opponent'] == hero_name) & (df['lane'] == lane) & (df['version'] == version_name)
+            
+            df = df[~(c1 | c2)]
+            
+            # Append new
+            new_rows = pd.DataFrame([row1, row2])
+            df = pd.concat([df, new_rows], ignore_index=True)
+            
+            self.conn.update(worksheet="matchups", data=df)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Error adding matchup: {e}")
+            return False
+
+    def delete_matchup(self, hero_name, lane, opponent_name, version_name):
+        """
+        Deletes a matchup (and its reverse) from the sheet for a specific version.
+        """
+        try:
+            try:
+                df = self.conn.read(worksheet="matchups")
+            except:
+                return False
+            
+            if df.empty: return True
+            if 'version' not in df.columns: return True # If no version col match, nothing to delete for specific version?
+
+            # Condition 1: hero=A, opp=B, ver=V
+            c1 = (df['hero'] == hero_name) & (df['opponent'] == opponent_name) & (df['lane'] == lane) & (df['version'] == version_name)
+            # Condition 2: hero=B, opp=A, ver=V
+            c2 = (df['hero'] == opponent_name) & (df['opponent'] == hero_name) & (df['lane'] == lane) & (df['version'] == version_name)
+            
+            df = df[~(c1 | c2)]
+            
+            self.conn.update(worksheet="matchups", data=df)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Error deleting matchup: {e}")
+            return False
+
+    # ------------------------------------------------------------------
+    # PLAYER MANAGEMENT
+    # ------------------------------------------------------------------
+    def get_all_players(self):
+        try:
+            try:
+                df = self.conn.read(worksheet="players")
+            except:
+                 return pd.DataFrame(columns=['id', 'ign', 'positions'])
+            
+            if df.empty: return pd.DataFrame(columns=['id', 'ign', 'positions'])
+            return df
+        except Exception as e:
+            st.error(f"Error loading players: {e}")
+            return pd.DataFrame()
+
+    def create_player(self, ign, positions):
+        try:
+            df = self.get_all_players()
+            
+            # Check for duplicate IGN? (Optional but good)
+            if 'ign' in df.columns and ign in df['ign'].values:
+                return False, "Player IGN already exists!"
+
+            new_id = str(uuid.uuid4())
+            # Join positions to string for storage
+            pos_str = ", ".join(positions) if isinstance(positions, list) else positions
+            
+            new_row = pd.DataFrame([{
+                "id": new_id, 
+                "ign": ign, 
+                "positions": pos_str
+            }])
+            
+            df = pd.concat([df, new_row], ignore_index=True)
+            self.conn.update(worksheet="players", data=df)
+            st.cache_data.clear()
+            return True, "Player created successfully!"
+        except Exception as e:
+            return False, str(e)
+
+    # ------------------------------------------------------------------
+    # TEAM MANAGEMENT
+    # ------------------------------------------------------------------
+    def get_all_teams(self):
+        try:
+            try:
+                df = self.conn.read(worksheet="teams")
+            except:
+                return pd.DataFrame(columns=['id', 'team_name', 'logo_url', 'roster'])
+            return df
+        except:
+             return pd.DataFrame()
+
+    def create_team(self, team_name, logo_url, roster_data=None):
+        """
+        Creates a new team. 
+        roster_data: dict, optional. If None, initializes empty structure.
+        """
+        try:
+            try:
+                df = self.conn.read(worksheet="teams")
+            except:
+                df = pd.DataFrame(columns=['id', 'team_name', 'logo_url', 'roster'])
+            
+            # Ensure columns exist
+            for col in ['id', 'team_name', 'logo_url', 'roster']:
+                if col not in df.columns: df[col] = ""
+
+            new_id = str(uuid.uuid4())
+            
+            if roster_data is None:
+                roster_data = {"main": {}, "sub": [], "coach": None}
+                
+            roster_json = json.dumps(roster_data)
+            
+            new_row = pd.DataFrame([{
+                "id": new_id,
+                "team_name": team_name,
+                "logo_url": logo_url,
+                "roster": roster_json
+            }])
+            
+            df = pd.concat([df, new_row], ignore_index=True)
+            self.conn.update(worksheet="teams", data=df)
+            st.cache_data.clear()
+            return True, "Team created successfully!"
+        except Exception as e:
+            return False, str(e)
+
+    def update_team(self, team_id, updated_data):
+        """
+        Updates an existing team.
+        updated_data: dict of fields to update (e.g. roster, team_name)
+        """
+        try:
+            try:
+                df = self.conn.read(worksheet="teams")
+            except:
+                return False, "Teams sheet not found."
+            
+            if df.empty: return False, "No teams found."
+            
+            if 'id' not in df.columns:
+                 return False, "ID column missing."
+
+            # Find row index
+            idx = df[df['id'] == team_id].index
+            if len(idx) == 0:
+                return False, "Team ID not found."
+            
+            idx = idx[0]
+            
+            # Update fields
+            for k, v in updated_data.items():
+                if k == 'roster' and isinstance(v, (dict, list)):
+                    v = json.dumps(v)
+                
+                if k in df.columns:
+                    df.at[idx, k] = v
+            
+            self.conn.update(worksheet="teams", data=df)
+            st.cache_data.clear()
+            return True, "Team updated successfully!"
+        except Exception as e:
+            return False, str(e)
+
+    # ------------------------------------------------------------------
+    # DRAFT LOGGING
+    # ------------------------------------------------------------------
+    def log_draft(self, mode, blue_team, red_team, blue_bans, red_bans, prediction):
+        try:
+            try:
+                df = self.conn.read(worksheet="draft_logs")
+            except:
+                df = pd.DataFrame(columns=['timestamp', 'mode', 'blue_team', 'red_team', 'blue_bans', 'red_bans', 'winner_prediction'])
+            
+            # Ensure columns
+            for col in ['timestamp', 'mode', 'blue_team', 'red_team', 'blue_bans', 'red_bans', 'winner_prediction']:
+                if col not in df.columns: df[col] = ""
+
+            new_row = pd.DataFrame([{
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "mode": mode,
+                "blue_team": json.dumps(blue_team),
+                "red_team": json.dumps(red_team),
+                "blue_bans": json.dumps(blue_bans),
+                "red_bans": json.dumps(red_bans),
+                "winner_prediction": prediction
+            }])
+            
+            df = pd.concat([df, new_row], ignore_index=True)
+            self.conn.update(worksheet="draft_logs", data=df)
+            return True, "Draft logged successfully!"
+        except Exception as e:
+            return False, str(e)
+
+    def save_hero(self, hero_data, version_name="VERSION 1.60.1.10"):
+        """
+        Add or Update a hero (Attributes ONLY).
+        Matchups are now handled externally in 'matchups' sheet.
+        """
+        try:
+            df = self.load_heroes(version_name)
+            
+            # Helper to ensure unique ID
+            if 'id' not in hero_data or not hero_data['id']:
+                hero_data['id'] = str(uuid.uuid4())
+            
+            # --- Update/Add Primary Hero ---
+            save_data = hero_data.copy()
+            
+            # Remove 'matchups' key if present, we don't save it to main sheet anymore
+            if 'matchups' in save_data:
+                del save_data['matchups']
+
+            # Check existence
+            if 'id' in df.columns and save_data['id'] in df['id'].values:
+                idx = df[df['id'] == save_data['id']].index[0]
+                for k, v in save_data.items():
+                    if k in df.columns:
+                        df.at[idx, k] = v
+            else:
+                new_row = pd.DataFrame([save_data])
+                df = pd.concat([df, new_row], ignore_index=True)
+            
+            # --- Serialize & Save ---
+            output_df = df.copy()
+            for col in ['counters', 'position']:
+                if col in output_df.columns:
+                     output_df[col] = output_df[col].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
+            
+            # Remove matchups col from output if it lingers?
+            # It might exist in old schema. We can leave it or ignore it.
+            # safe to verify 'matchups' is NOT in the columns we care about, or just leave it alone.
+
+            self.conn.update(worksheet=version_name, data=output_df)
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Error saving hero: {e}")
+            return False
+
+    def delete_hero(self, hero_id, version_name="VERSION 1.60.1.10"):
+        try:
+            df = self.load_heroes(version_name)
+            if 'id' in df.columns:
+                df = df[df['id'] != hero_id]
+                
+                # Convert lists to strings for writing
+                output_df = df.copy()
+                for col in ['counters', 'position']:
+                     if col in output_df.columns:
+                        output_df[col] = output_df[col].apply(lambda x: ", ".join(x) if isinstance(x, list) else x)
+                
+                if 'matchups' in output_df.columns:
+                     output_df['matchups'] = output_df['matchups'].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+                        
+                self.conn.update(worksheet=version_name, data=output_df)
+                st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Error deleting hero: {e}")
+            return False
+
+# INITIALIZE DB
+db = DBManager()
+
+# ==============================================================================
+# DIALOGS
+# ==============================================================================
+
+
+
+def render_hero_editor_ui():
+    """
+    Full-page Hero Editor.
+    Reads hero data from st.session_state['editing_hero'].
+    """
+    hero = st.session_state.get('editing_hero')
+    if not hero:
+        st.error("No hero selected for editing.")
+        if st.button("Back to Grid"):
+            st.session_state['show_editor'] = False
             st.rerun()
+        return
 
-# ==============================================================================
-# SIDEBAR NAVIGATION & STATE
-# ==============================================================================
-init_session_state()
+    # Header with Back Button
+    c_back, c_title = st.columns([1, 5])
+    with c_back:
+        if st.button("⬅️ Back"):
+            st.session_state['show_editor'] = False
+            st.session_state.pop('editing_hero', None)
+            st.rerun()
+    with c_title:
+        st.title(f"Edit Hero: {hero.get('name')}")
 
-
-# ==============================================================================
-with st.sidebar:
-    st.markdown("# TAOX BRAIN 🧠")
+    current_version = st.session_state.get('current_version', 'Sheet1')
     
-    # SYSTEM 1: VERSION SELECTOR
-    if db:
-        versions = get_versions()
-        version_opts = {v['name']: v['id'] for v in versions}
+    # Fetch current heroes for Counters
+    current_heroes_df = db.load_heroes(current_version)
+    all_hero_names = sorted(current_heroes_df['name'].dropna().unique().tolist()) if not current_heroes_df.empty else []
+
+    def safe_get_index(options, value, default_index=0):
+        if value and str(value) in options:
+            return options.index(str(value))
+        return default_index
+    
+    # --- FORM INPUTS ---
+    c1, c2 = st.columns(2)
+    with c1:
+        h_name = st.text_input("Hero Name", value=hero.get('name', ''))
         
-        if not versions:
-            st.warning("No Patch Data Found.")
-            if st.button("Initialize Season 1"):
-                # Clean boot for first run
-                clone_version(None, "Season 1 (Init)") # Logic needs to handle None source
-                st.rerun()
-        else:
-            selected_ver_name = st.selectbox("Current Patch", list(version_opts.keys()))
-            st.session_state['current_version_id'] = version_opts[selected_ver_name]
-            st.caption(f"ID: {st.session_state['current_version_id']}")
+        tier_opts = ["SS", "S", "A", "B", "C"]
+        tier_idx = safe_get_index(tier_opts, hero.get('tier'), 3)
+        h_tier = st.selectbox("Tier", tier_opts, index=tier_idx)
+        
+        class_opts = ["Fighter", "Assassin", "Mage", "Carry", "Support", "Tank"]
+        current_class = hero.get('class', [])
+        # Normalize class input to list
+        if isinstance(current_class, str): 
+            current_class = [c.strip() for c in current_class.split(',')] if ',' in current_class else [current_class] if current_class else []
+        elif not isinstance(current_class, list):
+            current_class = []
+        
+        # Ensure defaults are valid
+        default_classes = [c for c in current_class if c in class_opts]
+        h_class = st.multiselect("Class", class_opts, default=default_classes)
+    
+    with c2:
+        pos_opts = ['Dark Slayer', 'Jungle', 'Mid', 'Abyssal', 'Roam']
+        current_pos = hero.get('position', [])
+        # Normalize position input to list
+        if isinstance(current_pos, str): 
+            current_pos = [p.strip() for p in current_pos.split(',')] if ',' in current_pos else [current_pos] if current_pos else []
+        elif not isinstance(current_pos, list):
+            current_pos = []
+
+        h_pos = st.multiselect("Position", pos_opts, default=[p for p in current_pos if p in pos_opts])
+        
+        time_opts = ["Early Game", "Late Game", "Balanced"]
+        h_timing = st.selectbox("Power Spike", time_opts, index=safe_get_index(time_opts, hero.get('timing'), 2))
+        
+        current_counters = hero.get('counters', [])
+        if isinstance(current_counters, str):
+            current_counters = [c.strip() for c in current_counters.split(',')] if ',' in current_counters else [current_counters] if current_counters else []
+        elif not isinstance(current_counters, list):
+            current_counters = []
+
+        h_counters = st.multiselect("Weak Against", all_hero_names, default=[c for c in current_counters if c in all_hero_names])
+        
+    st.markdown("---")
+    
+    # --- Lane Matchups ---
+    st.subheader("🎯 Lane Matchups")
+    
+    # Internal state for matchups (Load from DB)
+    if 'matchups_loaded_for' not in st.session_state or st.session_state['matchups_loaded_for'] != hero.get('name'):
+         st.session_state['temp_matchups'] = db.load_matchups(hero.get('name'), current_version)
+         st.session_state['matchups_loaded_for'] = hero.get('name')
+
+    # Display List
+    if st.session_state['temp_matchups']:
+        st.caption("Current Matchups:")
+        for idx, m in enumerate(st.session_state['temp_matchups']):
+            c_info, c_edit, c_del = st.columns([5, 1, 1])
+            with c_info:
+                lane_str = f"[{m.get('lane', 'Any')}]"
+                st.markdown(f"**{lane_str}** vs **{m['opponent']}** : `{m['win_rate']}%`")
+            with c_edit:
+                if st.button("✏️", key=f"edit_m_{idx}"):
+                    st.session_state['edit_matchup_idx'] = idx
+                    st.session_state['edit_lane'] = m.get('lane')
+                    st.session_state['edit_opponent'] = m.get('opponent')
+                    st.session_state['edit_win_rate'] = int(m.get('win_rate', 50))
+                    st.rerun()
+            with c_del:
+                if st.button("🗑️", key=f"del_m_{idx}"):
+                    # DELETE from DB
+                    if db.delete_matchup(hero.get('name'), m.get('lane'), m.get('opponent'), current_version):
+                        st.success("Deleted!")
+                        st.session_state.pop('matchups_loaded_for', None) # Force reload
+                        st.rerun()
     else:
-        st.session_state['current_version_id'] = None
+        st.info("No matchups recorded.")
+
+    # Determine Edit Mode
+    edit_idx = st.session_state.get('edit_matchup_idx', None)
+    is_editing = edit_idx is not None
+    
+    form_label = f"✏️ แก้ไขข้อมูล (Edit Matchup #{edit_idx+1})" if is_editing else "➕ เพิ่มข้อมูลการชนเลน (Add New Matchup)"
+    btn_label = "Update Matchup" if is_editing else "Confirm Add"
+
+    # Add/Edit Matchup Form (Expander)
+    should_expand = is_editing 
+    
+    with st.expander(form_label, expanded=should_expand):
+        with st.form("add_matchup_form"):
+            ac1, ac2 = st.columns(2)
+            
+            # Pre-fill
+            my_positions = h_pos if h_pos else ["Mid", "Roam", "Abyssal", "Dark Slayer", "Jungle"]
+            d_lane = st.session_state.get('edit_lane') if is_editing else None
+            try:
+                lane_ix = my_positions.index(d_lane) if d_lane in my_positions else 0
+            except:
+                lane_ix = 0
+            
+            with ac1:
+                new_m_lane = st.selectbox("My Lane", my_positions, index=lane_ix)
+
+            opps = [n for n in all_hero_names if n != hero.get('name')]
+            d_opp = st.session_state.get('edit_opponent') if is_editing else None
+            try:
+                opp_ix = opps.index(d_opp) if d_opp in opps else 0
+            except:
+                opp_ix = 0
+            
+            with ac2:
+                new_m_opp = st.selectbox("Opponent", opps, index=opp_ix)
+            
+            d_wr = st.session_state.get('edit_win_rate', 50) if is_editing else 50
+            new_m_wr = st.slider("Win Rate %", 0, 100, d_wr)
+            
+            c_submit, c_cancel = st.columns([1, 1])
+            with c_submit:
+                submitted = st.form_submit_button(btn_label)
+            with c_cancel:
+                canceled = st.form_submit_button("Cancel") 
+            
+            if canceled:
+                st.session_state.pop('edit_matchup_idx', None)
+                st.session_state.pop('edit_lane', None)
+                st.session_state.pop('edit_opponent', None)
+                st.session_state.pop('edit_win_rate', None)
+                st.rerun()
+
+            if submitted:
+                # DB OPERATION
+                # Bi-directional Add/Update
+                if db.add_matchup(hero.get('name'), new_m_lane, new_m_opp, new_m_wr, current_version):
+                     st.success("Matchup Saved!")
+                     # Clear Edit State
+                     st.session_state.pop('edit_matchup_idx', None)
+                     st.session_state.pop('edit_lane', None)
+                     st.session_state.pop('edit_opponent', None)
+                     st.session_state.pop('edit_win_rate', None)
+                     # Force reload to see changes
+                     st.session_state.pop('matchups_loaded_for', None) 
+                     st.rerun()
+                else:
+                    st.error("Failed to save matchup.")
 
     st.markdown("---")
     
-    menu = st.radio(
-        "Modules", 
-        ["Meta Management", "Team Roster", "Match Logger", "Draft Simulator"],
-        label_visibility="collapsed"
-    )
+    # --- UNSAVED CHANGES DETECTION ---
+    has_changes = False
+    
+    # 1. Compare Normalized Values
+    c_name = hero.get('name', '')
+    if h_name != c_name: has_changes = True
+    
+    c_tier = hero.get('tier', '')
+    if h_tier != c_tier: has_changes = True
+    
+    # Lists (Sort for comparison)
+    if set(h_class) != set(default_classes): has_changes = True
+    if set(h_pos) != set(current_pos): has_changes = True
+    
+    c_timing = hero.get('timing', '')
+    if h_timing != c_timing: has_changes = True
+    
+    if set(h_counters) != set(current_counters): has_changes = True
 
-# ==============================================================================
-# MODULE 1: META & HERO MANAGEMENT
-# ==============================================================================
-if menu == "Meta Management":
-    st.title("META & HERO MANAGEMENT")
+    # Note: Matchups are saved instantly, so we don't track them as "unsaved" in this context context,
+    # as the user requested "existing logic for saving ... intact".
     
-    tab1, tab2, tab3 = st.tabs(["Version Control", "Hero Editor", "Synergy Builder"])
+    col_save, col_del = st.columns([3, 1])
+    with col_save:
+        if has_changes:
+            st.warning("⚠️ คุณมีการแก้ไขข้อมูลที่ยังไม่ได้บันทึก")
+            
+        if st.button("💾 บันทึกการแก้ไข", type="primary", use_container_width=True, help="Save changes to Google Sheets"):
+            updated_data = {
+                "id": hero.get('id'),
+                "name": h_name,
+                "tier": h_tier,
+                "class": ", ".join(h_class) if isinstance(h_class, list) else h_class,
+                "position": h_pos,
+                "timing": h_timing,
+                "counters": h_counters,
+                # Matchups handled separately now
+            }
+            
+            if db.save_hero(updated_data, current_version):
+                st.success(f"Hero {h_name} updated!")
+                time.sleep(1)
+                st.session_state['show_editor'] = False # Go back to grid
+                st.rerun()
     
-    with tab1:
-        st.subheader("Patch Versioning")
-        
+    with col_del:
+        # Add some vertical spacing or align with the bottom
+        st.write("") 
+        if st.button("🗑️ Delete Hero", use_container_width=True):
+            if db.delete_hero(hero.get('id'), current_version):
+                st.warning(f"Hero {h_name} deleted!")
+                time.sleep(1)
+                st.session_state['show_editor'] = False # Go back to grid
+                st.rerun()
+
+@st.dialog("🦸 Add New Hero")
+def add_hero_dialog():
+    current_version = st.session_state.get('current_version', 'Sheet1')
+    
+    current_heroes_df = db.load_heroes(current_version)
+    all_hero_names = sorted(current_heroes_df['name'].dropna().unique().tolist()) if not current_heroes_df.empty else []
+
+    with st.form("f_add_hero"):
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("### Create New Patch")
-            with st.form("new_patch"):
-                new_v_name = st.text_input("New Version Name", "S1 2025 - Patch 1")
-                clone_source = st.selectbox("Clone Data From", ["Empty"] + list(version_opts.keys()) if 'version_opts' in locals() else [])
+            h_name = st.text_input("Hero Name", placeholder="e.g. Valhein")
+            h_tier = st.selectbox("Tier", ["SS", "S", "A", "B", "C"])
+            h_role = st.selectbox("Class", ["Assassin", "Mage", "Fighter", "Carry", "Tank", "Support"])
+        
+        with c2:
+            h_pos = st.multiselect("Position", ["Jungle", "Mid", "Abyssal", "Dark Slayer", "Roam"])
+            h_time = st.selectbox("Power Spike", ["Early Game", "Late Game", "Balanced"])
+            h_counters = st.multiselect("Weak Against", all_hero_names)
+            
+        st.markdown("---")
+        
+        if st.form_submit_button("🔥 Register Hero"):
+            if not h_name:
+                st.error("Hero Name is required!")
+            else:
+                hero_data = {
+                    "name": h_name,
+                    "tier": h_tier,
+                    "class": h_role,
+                    "position": h_pos,
+                    "timing": h_time,
+                    "counters": h_counters,
+                    # ID is handled in save_hero
+                }
                 
-                if st.form_submit_button("Create Version"):
-                    if clone_source == "Empty":
-                        # Create empty
-                        db.collection('versions').add({
-                            "name": new_v_name,
-                            "created_at": datetime.now(),
-                            "is_active": True
-                        })
-                        st.success(f"Created empty version: {new_v_name}")
+                if db.save_hero(hero_data, current_version):
+                    st.success(f"Hero {h_name} added to {current_version}!")
+                    time.sleep(1)
+                    st.rerun()
+
+# ==============================================================================
+# UI COMPONENTS
+# ==============================================================================
+
+def render_hero_grid(heroes):
+    """
+    Render a grid of heroes as clickable cards.
+    Each card is a button that opens the edit dialog.
+    """
+    cols = st.columns(4) # 4 cards per row for better visibility on wide screens
+    
+    for i, hero in enumerate(heroes):
+        with cols[i % 4]:
+            # Data Fallbacks
+            name = hero.get('name', 'UNKNOWN')
+            tier = hero.get('tier', '?')
+            role = hero.get('class', '-')
+            
+            # Ensure lists are strings if accessing directly
+            pos_list = hero.get('position', [])
+            pos_str = ", ".join(pos_list) if isinstance(pos_list, list) else str(pos_list)
+            
+            timing = hero.get('timing', '-')
+            ct_list = hero.get('counters', [])
+            
+            # Format Counter list for display (limit to 2)
+            if ct_list:
+                ct_display = ", ".join(ct_list[:2])
+                if len(ct_list) > 2:
+                    ct_display += f" (+{len(ct_list)-2})"
+            else:
+                ct_display = "-"
+
+            # --- HIGH FIDELITY CARD LABEL ---
+            # Using Markdown colors for styling fields
+            # Header: LARGE NAME ... [Tier] (Gold)
+            
+            # Tier: Gold/Yellow text
+            tier_badge = f":orange[[{tier}]]" if tier else ""
+            
+            # --- MINIMALIST IMAGE CARD LABEL ---
+            # Strategy: Use Markdown Image syntax to inject the image tag.
+            # CSS will handle positioning it as absolute background.
+            # Content: Image + Newlines + Name + Tier Badge
+            
+            img_url = hero.get('image_url', '')
+            img_md = f"![bg]({img_url})" if img_url else ""
+            
+            # Tier Badge logic (using emoji or simple text)
+            tier_badge = f"[{tier}]" if tier else ""
+            
+            # Using lots of newlines to push text down is handled by CSS flex-end, 
+            # BUT we need content to exist.
+            # Label = Image_MD + Name
+            
+            label = f"""{img_md}
+            
+{name} {tier_badge}"""
+            
+            # Render Button
+            if st.button(label, key=f"card_{hero.get('id')}", use_container_width=True):
+                 # Set state as requested
+                 st.session_state['editing_hero'] = hero
+                 st.session_state['show_editor'] = True
+                 st.rerun()
+
+def render_hero_grid_page(selected_ver_name):
+    st.subheader(f"🦸 Hero Grid (Patch: {selected_ver_name})")
+    
+    # Controls & Filters
+    c_search, c_filter = st.columns([2, 1])
+    with c_search:
+        search_query = st.text_input("🔍 Search Hero", placeholder="Type hero name...", label_visibility="collapsed")
+    with c_filter:
+        filter_pos = st.multiselect("Filter Position", options=['Dark Slayer', 'Jungle', 'Mid', 'Abyssal', 'Roam'], placeholder="All Positions", label_visibility="collapsed")
+
+    # FAB Add Button
+    col_add, _ = st.columns([1, 10])
+    with col_add: 
+        if st.button("＋", key="fab_add_hero", type="primary", help="Add New Hero"):
+            add_hero_dialog()
+    
+    # Fetch Data
+    df = db.load_heroes(selected_ver_name)
+    
+    filtered_heroes = []
+    if not df.empty:
+        all_heroes = df.to_dict('records')
+        
+        for hero in all_heroes:
+            # Name Filter
+            if search_query and search_query.lower() not in str(hero.get('name', '')).lower():
+                continue
+            
+            # Position Filter
+            if filter_pos:
+                h_pos = hero.get('position', [])
+                if not set(filter_pos).intersection(set(h_pos)):
+                    continue
+            
+            filtered_heroes.append(hero)
+
+        # Sort
+        filtered_heroes.sort(key=lambda x: str(x.get('name', '')).strip().lower())
+
+    if not filtered_heroes:
+         if search_query or filter_pos:
+             st.info(f"No heroes found matching filters.")
+         else:
+             st.info("No heroes found in this patch. Add one!")
+    else:
+        # Render the Grid
+        render_hero_grid(filtered_heroes)
+
+def render_version_control_ui():
+    st.header("Version Control System")
+    st.caption("Manage game patches using Google Sheets Tabs.")
+
+    # 1. List current versions
+    versions = db.get_all_versions()
+    
+    # 2. Create New Version Form
+    st.subheader("Create New Patch")
+    with st.form("new_patch_form"):
+        new_v_name = st.text_input("New Version Name", placeholder="e.g. S1_Patch_2")
+        
+        # Options: Empty or Clone from existing
+        clone_options = ["Empty"] + versions
+        clone_source = st.selectbox("Clone Data From", clone_options)
+        
+        submitted = st.form_submit_button("Create Version")
+        
+        if submitted:
+            if not new_v_name:
+                st.error("Please enter a version name.")
+            else:
+                with st.spinner(f"Creating version '{new_v_name}'..."):
+                    success = db.create_version(new_v_name, clone_source)
+                    if success:
+                        st.success(f"Successfully created version: {new_v_name}")
+                        time.sleep(1.5)
+                        st.rerun()
+    
+    st.markdown("---")
+    st.subheader("Existing Versions")
+    st.table(pd.DataFrame(versions, columns=["Available Versions"]))
+
+# ==============================================================================
+# PLAYER MANAGEMENT UI
+# ==============================================================================
+
+def render_player_manager():
+    st.header("👤 Player Manager")
+    
+    t1, t2 = st.tabs(["Add Player", "All Players"])
+    
+    with t1:
+        st.subheader("Register New Player")
+        with st.form("add_player_form"):
+            ign = st.text_input("IGN (In-Game Name)")
+            
+            role_options = ['Mid', 'Roam', 'Abyssal', 'Dark Slayer', 'Jungle', 'Coach']
+            roles = st.multiselect("Positions", role_options)
+            
+            submitted = st.form_submit_button("Create Player")
+            
+            if submitted:
+                if not ign or not roles:
+                    st.error("Please fill in all fields.")
+                else:
+                    success, msg = db.create_player(ign, roles)
+                    if success:
+                        st.success(msg)
                         time.sleep(1)
                         st.rerun()
                     else:
-                        # Clone
-                        src_id = version_opts[clone_source]
-                        with st.spinner("Cloning Meta Data..."):
-                            clone_version(src_id, new_v_name)
-                        st.success(f"Successfully cloned {clone_source} to {new_v_name}")
+                        st.error(msg)
+
+    with t2:
+        st.subheader("Registered Players")
+        players = db.get_all_players()
+        if not players.empty:
+            # Clean up display: Hide ID, Show IGN & Positions
+            display_df = players[['ign', 'positions']].copy()
+            display_df.columns = ["In-Game Name", "Positions"]
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No players registered yet.")
+
+# ==============================================================================
+# TEAM BUILDER UI
+# ==============================================================================
+
+def render_team_builder():
+    st.header("🛡️ Team Builder")
+    
+    # 1. Determine View Mode
+    team_id = st.session_state.get('editing_team_id', None)
+    
+    if team_id:
+        render_team_roster_editor(team_id)
+    else:
+        render_team_grid_view()
+
+def render_team_grid_view():
+    st.subheader("Manage Teams")
+    
+    # Create Team Dialog
+    @st.dialog("Create New Team")
+    def create_team_dialog():
+        with st.form("new_team_form"):
+            t_name = st.text_input("Team Name")
+            t_logo = st.text_input("Logo URL (Optional)")
+            if st.form_submit_button("Create", type="primary"):
+                if t_name:
+                    success, msg = db.create_team(t_name, t_logo)
+                    if success:
+                        st.success(msg)
                         time.sleep(1)
                         st.rerun()
+                    else:
+                        st.error(msg)
+                else:
+                    st.error("Name required.")
+
+    if st.button("➕ Create New Team"):
+        create_team_dialog()
+        
+    st.markdown("---")
     
-    with tab2:
-        if st.session_state.get('current_version_id'):
-            st.subheader(f"Heroes (Patch: {selected_ver_name})")
+    teams = db.get_all_teams()
+    if teams.empty:
+        st.info("No teams found. Create one to get started!")
+        return
+
+    # Render Teams as Cards
+    cols = st.columns(3)
+    for idx, row in teams.iterrows():
+        c = cols[idx % 3]
+        with c:
+            with st.container(border=True):
+                logo = row.get('logo_url')
+                if isinstance(logo, str) and logo.strip().startswith("http"):
+                    st.image(logo, width=50)
+                else:
+                    st.markdown("🛡️")
+                
+                st.subheader(row['team_name'])
+                if st.button("Edit Roster", key=f"edit_team_{row['id']}"):
+                    st.session_state['editing_team_id'] = row['id']
+                    st.rerun()
+
+def render_team_roster_editor(team_id):
+    # Fetch Data
+    teams = db.get_all_teams()
+    if teams.empty: 
+        st.error("Team not found.")
+        return
+        
+    team = teams[teams['id'] == team_id].iloc[0]
+    
+    # Back Button
+    if st.button("⬅️ Back to Teams"):
+        st.session_state.pop('editing_team_id', None)
+        st.rerun()
+
+    c_head, c_img = st.columns([4, 1])
+    with c_head:
+        st.markdown(f"## Editing Roster: {team['team_name']}")
+    with c_img:
+        t_logo = team.get('logo_url')
+        if isinstance(t_logo, str) and t_logo.strip().startswith("http"):
+             st.image(t_logo, width=80)
+        else:
+             st.markdown("## 🛡️")
+
+    # Parse Roster Data
+    current_roster = json.loads(team['roster']) if team['roster'] else {"main": {}, "sub": [], "coach": None}
+    
+    # Fetch Players
+    players_df = db.get_all_players()
+    if players_df.empty: 
+        st.warning("No players DB found.")
+        return
+        
+    all_player_names = players_df['ign'].tolist()
+    all_players_data = players_df.to_dict('records')
+    # Map ID -> IGN for pre-filling
+    id_to_name = dict(zip(players_df['id'], players_df['ign']))
+    
+    # Main Roles Form
+    with st.form("edit_roster_form"):
+        st.subheader("Starting Lineup")
+        
+        main_roles = ['Dark Slayer', 'Jungle', 'Mid', 'Abyssal', 'Roam']
+        role_keys = {'Dark Slayer': 'ds', 'Jungle': 'jg', 'Mid': 'mid', 'Abyssal': 'adl', 'Roam': 'sup'}
+        
+        selected_main = {}
+        cols = st.columns(5)
+        
+        for i, role in enumerate(main_roles):
+            with cols[i]:
+                # Filter Logic
+                candidates = []
+                for p in all_players_data:
+                     # Robust position parsing
+                    p_pos = p.get('positions', [])
+                    if isinstance(p_pos, str): p_pos = [x.strip() for x in p_pos.split(',')]
+                    elif not isinstance(p_pos, list): p_pos = []
+                    
+                    if role in p_pos:
+                        candidates.append(p['ign'])
+                
+                # Pre-fill
+                current_id = current_roster.get('main', {}).get(role_keys[role])
+                current_name = id_to_name.get(current_id, "None")
+                
+                # Ensure current choice is in options
+                options = ["None"] + candidates
+                if current_name not in options and current_name != "None":
+                     options.append(current_name)
+                     
+                idx = options.index(current_name) if current_name in options else 0
+                selected_main[role] = st.selectbox(f"{role}", options, index=idx, key=f"e_{role}")
+
+        st.markdown("---")
+        st.subheader("Bench & Staff")
+        c1, c2, c3 = st.columns(3)
+        
+        # Subs
+        subs_ids = current_roster.get('sub', [])
+        sub1_id = subs_ids[0] if len(subs_ids) > 0 else None
+        sub2_id = subs_ids[1] if len(subs_ids) > 1 else None
+        
+        sub1_name = id_to_name.get(sub1_id, "None")
+        sub2_name = id_to_name.get(sub2_id, "None")
+        
+        with c1:
+            p_sub1 = st.selectbox("Sub 1", ["None"] + all_player_names, index=(["None"] + all_player_names).index(sub1_name) if sub1_name in all_player_names else 0)
+        with c2:
+            p_sub2 = st.selectbox("Sub 2", ["None"] + all_player_names, index=(["None"] + all_player_names).index(sub2_name) if sub2_name in all_player_names else 0)
             
-            df = get_heroes(st.session_state['current_version_id'])
+        with c3:
+            # Coach Logic
+            coach_cands = []
+            for p in all_players_data:
+                p_pos = p.get('positions', [])
+                if isinstance(p_pos, str): p_pos = [x.strip() for x in p_pos.split(',')]
+                elif not isinstance(p_pos, list): p_pos = []
+                
+                if 'Coach' in p_pos: coach_cands.append(p['ign'])
             
-            # Editor
-            if df.empty:
-                st.info("No heroes in this version. Add one manually or clone from previous.")
-                cols_schema = pd.DataFrame(columns=["name", "role", "tier", "meta_score", "image_url", "counters", "version_id"])
-                df = cols_schema
-            else:
-                # Fill missing cols
-                for c in ["name", "role", "tier", "meta_score", "image_url"]:
-                     if c not in df.columns: df[c] = ""
+            c_id = current_roster.get('coach')
+            c_name = id_to_name.get(c_id, "None")
             
-            edited_df = st.data_editor(
-                df,
-                column_config={
-                    "id": None,
-                    "version_id": None,
-                    "image_url": st.column_config.ImageColumn("Avatar"),
-                    "tier": st.column_config.SelectboxColumn("Tier", options=["S", "A", "B", "C"]),
-                    "role": st.column_config.SelectboxColumn("Role", options=["Assassin", "Mage", "Fighter", "Support", "Tank", "Carry"]),
-                    "meta_score": st.column_config.ProgressColumn("Score", min_value=0, max_value=100, format="%d"),
+            c_opts = ["None"] + coach_cands
+            if c_name not in c_opts and c_name != "None": c_opts.append(c_name)
+            
+            p_coach = st.selectbox("Coach", c_opts, index=c_opts.index(c_name) if c_name in c_opts else 0)
+
+        if st.form_submit_button("💾 Save Roster", type="primary"):
+            # Validation
+            p_ds = selected_main['Dark Slayer']
+            p_jg = selected_main['Jungle']
+            p_mid = selected_main['Mid']
+            p_adl = selected_main['Abyssal']
+            p_sup = selected_main['Roam']
+            
+            sel = [p_ds, p_jg, p_mid, p_adl, p_sup, p_sub1, p_sub2, p_coach]
+            real = [x for x in sel if x != "None"]
+            if len(real) != len(set(real)):
+                st.error("Duplicate players selected.")
+                st.stop()
+                
+            # Payload construction
+            name_to_id = dict(zip(players_df['ign'], players_df['id']))
+            
+            new_roster = {
+                "main": {
+                    "ds": name_to_id.get(p_ds),
+                    "jg": name_to_id.get(p_jg),
+                    "mid": name_to_id.get(p_mid),
+                    "adl": name_to_id.get(p_adl),
+                    "sup": name_to_id.get(p_sup)
                 },
-                num_rows="dynamic",
-                use_container_width=True,
-                key="hero_editor_v2"
-            )
+                "sub": [name_to_id.get(p_sub1), name_to_id.get(p_sub2)],
+                "coach": name_to_id.get(p_coach)
+            }
             
-            if st.button("Save Changes"):
-                with st.spinner("Syncing..."):
-                    for i, row in edited_df.iterrows():
-                        data = row.to_dict()
-                        h_id = data.pop("id", None)
-                        
-                        # FORCE current version ID
-                        data['version_id'] = st.session_state['current_version_id']
-                        
-                        # Simple upsert
-                        if h_id and isinstance(h_id, str) and len(h_id) > 2:
-                            db.collection('heroes').document(h_id).set(data, merge=True)
-                        else:
-                            if data.get('name'):
-                                db.collection('heroes').add(data)
-                                
-                st.success("Saved!")
+            success, msg = db.update_team(team_id, {"roster": new_roster})
+            if success:
+                st.success("Roster updated!")
                 time.sleep(1)
                 st.rerun()
-                
-    with tab3:
-        st.subheader("Synery Builder")
-        # Reuse logic from old app but scoped to version
-        # (Simplified for brevity as requested structure is huge)
-        st.info("Combo builder logic here (linked to current version heroes).")
-
+            else:
+                st.error(msg)
 
 # ==============================================================================
-# MODULE 2: TEAM & ROSTER MANAGEMENT
+# DRAFT ENGINE
 # ==============================================================================
-elif menu == "Team Roster":
-    st.title("TEAM & ROSTER MANAGEMENT")
-    
-    if not db:
-        st.error("Database connection failed. Please check initialization.")
-    else:
-        # Initialize session state from DB if empty
-        if not st.session_state['players']:
-            st.session_state['players'] = get_players()
-        if not st.session_state['teams']:
-            st.session_state['teams'] = get_teams()
-            
-        tab1, tab2, tab3 = st.tabs(["👤 Register Person", "🛡️ Create Team", "📋 Roster Market"])
+import random
+
+class DraftEngine:
+    def __init__(self, mode="HvB"):
+        self.mode = mode # 'HvB', 'HvH', 'BvB'
         
-        # --- TAB 1: REGISTER PERSON ---
-        # --- TAB 1: REGISTER PERSON ---
-        with tab1:
-            if st.button("➕ Register New Person", type="primary", use_container_width=True):
-                register_player_dialog()
+        # Phases: 'INIT', 'BAN', 'PICK', 'COMPLETE'
+        self.phase = 'BAN' 
+        
+        # Turn: 'BLUE' or 'RED'
+        self.turn = 'BLUE'
+        
+        self.blue_bans = []
+        self.red_bans = []
+        self.blue_picks = []
+        self.red_picks = []
+        
+        # Pro Tournament Sequence (18 Steps)
+        # Phase 1: 4 Bans (2 each) -> 6 Picks (3 each)
+        # Phase 2: 4 Bans (2 each) -> 4 Picks (2 each)
+        # Format: (Phase, Side)
+        self.sequence = [
+            # --- PHASE 1 BANS ---
+            ('BAN', 'BLUE'), ('BAN', 'RED'), ('BAN', 'BLUE'), ('BAN', 'RED'),
+            # --- PHASE 1 PICKS ---
+            ('PICK', 'BLUE'), ('PICK', 'RED'), ('PICK', 'RED'), ('PICK', 'BLUE'),
+            ('PICK', 'BLUE'), ('PICK', 'RED'),
+            # --- PHASE 2 BANS ---
+            ('BAN', 'RED'), ('BAN', 'BLUE'), ('BAN', 'RED'), ('BAN', 'BLUE'),
+            # --- PHASE 2 PICKS ---
+            ('PICK', 'RED'), ('PICK', 'BLUE'), ('PICK', 'BLUE'), ('PICK', 'RED')
+        ]
+        self.step_index = 0
+        self.draft_log = []
+
+    def get_valid_heroes(self, all_heroes):
+        # Exclude banned and picked
+        taken = set(self.blue_bans + self.red_bans + self.blue_picks + self.red_picks)
+        return [h for h in all_heroes if h not in taken]
+
+    def is_complete(self):
+        return self.step_index >= len(self.sequence)
+
+    def get_current_state(self):
+        if self.is_complete(): return 'COMPLETE', None
+        return self.sequence[self.step_index]
+
+    def make_move(self, hero_name):
+        if self.is_complete(): return False
+        
+        phase, side = self.sequence[self.step_index]
+        self.turn = side # Update turn indicator
+        
+        if phase == 'BAN':
+            if side == 'BLUE': self.blue_bans.append(hero_name)
+            else: self.red_bans.append(hero_name)
+        else:
+            if side == 'BLUE': self.blue_picks.append(hero_name)
+            else: self.red_picks.append(hero_name)
             
-            st.markdown("---")
-            st.markdown("### 👥 Registered People")
+        self.draft_log.append(f"{side} {phase}: {hero_name}")
+        self.step_index += 1
+        return True
+
+    def auto_bot_move(self, all_heroes):
+        # 1. Get Valid Candidates
+        valid = self.get_valid_heroes(all_heroes)
+        if not valid: return False
+        
+        # 2. Smart Logic (Placeholder for now: simple random)
+        # In future: Check matchups, prioritize S-Tier, fill missing roles
+        choice = random.choice(valid)
+        
+        return self.make_move(choice)
+
+    def analyze_matchup(self):
+        # Simple prediction based on nothing for now, placeholder
+        return "50-50"
+
+# Main Router (Placeholder)
+
+
+# ==============================================================================
+# DRAFT SIMULATOR UI
+# ==============================================================================
+
+def render_draft_simulator():
+    st.header("🎮 Draft Simulator")
+    
+    # Fetch Data
+    curr_ver = st.session_state.get('current_version', 'VERSION 1.60.1.10')
+    heroes_df = db.load_heroes(curr_ver)
+    if heroes_df.empty:
+        st.warning("No heroes found for draft.")
+        return
+    all_hero_names = sorted(heroes_df['name'].dropna().unique().tolist())
+
+    # Initialize Engine in Session State
+    if 'draft_engine' not in st.session_state:
+        st.session_state['draft_engine'] = None
+    
+    if st.session_state['draft_engine'] is None:
+        # Configuration Screen
+        st.subheader("Start New Draft")
+        c1, c2, c3 = st.columns(3)
+        if c1.button("� Human vs 🤖 Bot", use_container_width=True):
+             st.session_state['draft_engine'] = DraftEngine("HvB")
+             st.rerun()
+        if c2.button("👤 Human vs 👤 Human", use_container_width=True):
+             st.session_state['draft_engine'] = DraftEngine("HvH")
+             st.rerun()
+        if c3.button("🤖 Bot vs 🤖 Bot", use_container_width=True):
+             st.session_state['draft_engine'] = DraftEngine("BvB")
+             st.rerun()
+        return
+
+    # Engine Active
+    engine = st.session_state['draft_engine']
+    completed = engine.is_complete()
+    
+    # --- HEADER ---
+    phase_text, side_text = engine.get_current_state()
+    if completed:
+        st.success(f"Draft Complete! Prediction: {engine.analyze_matchup()}")
+        if st.button("Save & Reset"):
+             db.log_draft(engine.mode, engine.blue_picks, engine.red_picks, engine.blue_bans, engine.red_bans, engine.analyze_matchup())
+             st.session_state['draft_engine'] = None
+             st.rerun()
+    else:
+        st.info(f"Phase: {phase_text} | Turn: {side_text}")
+
+    # --- BOARD ---
+    c_blue, c_mid, c_red = st.columns([2, 1, 2])
+    
+    with c_blue:
+        st.markdown("### 🔵 Blue Team")
+        # Bans
+        st.caption("Bans: " + ", ".join(engine.blue_bans))
+        for p in engine.blue_picks:
+            st.button(p, key=f"blue_{p}", disabled=True, use_container_width=True)
             
-            players = st.session_state['players']
-            if not players:
-                st.info("No people registered yet.")
+    with c_red:
+         st.markdown("### 🔴 Red Team")
+         st.caption("Bans: " + ", ".join(engine.red_bans))
+         for p in engine.red_picks:
+            st.button(p, key=f"red_{p}", disabled=True, use_container_width=True)
+
+    # --- ACTION AREA (HERO GRID) ---
+    if not completed:
+        st.markdown("---")
+        
+        # Phase Indicator
+        p_color = "🔴" if side_text == 'RED' else "🔵"
+        st.markdown(f"### {p_color} {side_text} TURN: **{phase_text}**")
+        
+        # Determine who is acting
+        # HvB: If Turn=Blue -> Human. Turn=Red -> Bot.
+        is_human_turn = False
+        if engine.mode == "HvB":
+            if engine.turn == 'BLUE': is_human_turn = True
+        elif engine.mode == "HvH":
+            is_human_turn = True
+        # BvB: Always false
+        
+        if is_human_turn:
+            st.caption("Select a hero to ban/pick:")
+            
+            # Search Bar
+            search_q = st.text_input("🔍 Search Hero", placeholder="Type to filter...", label_visibility="collapsed")
+            
+            valid_heroes = engine.get_valid_heroes(all_hero_names)
+            
+            # Filter by Search
+            if search_q:
+                valid_heroes = [h for h in valid_heroes if search_q.lower() in h.lower()]
+            
+            if not valid_heroes:
+                st.info("No heroes found.")
             else:
-                # Reverse list to show newest first
-                rev_players = players[::-1]
-                
-                # Create Team Lookup for Display
-                team_map = {t['id']: t['name'] for t in st.session_state['teams']}
-                
-                # --- FILTER LOGIC ---
-                unique_teams = sorted(list(set([t['name'] for t in st.session_state['teams']])))
-                # Calculate players per team for UI hint if desired, but kept simple for now
-                
-                c_filter, _ = st.columns([1, 2])
-                with c_filter:
-                   filter_opts = ["All Teams", "Free Agent"] + unique_teams
-                   sel_filter = st.selectbox("🔍 Filter by Team", filter_opts)
-                
-                # Apply Filter
-                filtered_players = []
-                for p in rev_players:
-                    p_team_name = team_map.get(p.get('current_team_id'))
-                    
-                    if sel_filter == "All Teams":
-                        filtered_players.append(p)
-                    elif sel_filter == "Free Agent":
-                        if not p_team_name: filtered_players.append(p)
-                    else:
-                        if p_team_name == sel_filter: filtered_players.append(p)
-
-                # Grid of 3
-                cols = st.columns(3)
-                for i, p in enumerate(filtered_players):
-                    with cols[i % 3]:
-                        # Resolve Team Name
-                        assigned_team = team_map.get(p.get('current_team_id'), None)
-                        team_status = f"🛡️ {assigned_team}" if assigned_team else "Free Agent"
-                        
-                        # Construct multi-line label
-                        # Name
-                        # Roles (comma joined)
-                        # Team Status
-                        role_str = ", ".join(p.get('roles', []))
-                        label = f"{p['ign']}\n{role_str}\n{team_status}"
-                        
-                        if st.button(label, key=f"card_p_{p['id']}", use_container_width=True):
-                            edit_player_dialog(p)
-
-        # --- TAB 2: CREATE TEAM ---
-        # --- TAB 2: CREATE TEAM ---
-        with tab2:
-            if st.button("➕ Create New Team", type="primary", use_container_width=True):
-                 create_team_dialog()
-            
-            st.markdown("---")
-            st.markdown("### 🛡️ Existing Teams")
-            
-            teams = st.session_state['teams']
-            if not teams:
-                st.info("No teams created yet.")
-            else:
-                cols = st.columns(3)
-                for i, t in enumerate(teams):
-                    with cols[i % 3]:
-                        # Find Coach Name
-                        c_name = "TBD"
-                        c_id = t.get('coach_id')
-                        if c_id:
-                            found = next((p for p in st.session_state['players'] if p['id'] == c_id), None)
-                            if found: c_name = found['ign']
-                        
-                        # Label
-                        label = f"{t['name']}\n🧠 Coach: {c_name}"
-                        
-                        if st.button(label, key=f"card_t_{t['id']}", use_container_width=True):
-                            manage_roster_dialog(t)
-
-        # --- TAB 3: ROSTER MARKET ---
-        with tab3:
-            st.subheader("Manage Active Rosters")
-            teams = st.session_state['teams']
-            if not teams:
-                st.info("Create a team first.")
-            else:
-                t_names = [t['name'] for t in teams]
-                sel_t_name = st.selectbox("Select Team", t_names)
-                sel_team = next(t for t in teams if t['name'] == sel_t_name)
-                
-                # Fetch players
-                all_p = st.session_state['players']
-                t_lookup = {t['id']: t['name'] for t in teams}
-                
-                # HELPER: Build options for a specific role filter
-                def get_options(role_filter=None):
-                    opts = {"None": None}
-                    for p in all_p:
-                        # 1. Filter Check
-                        if role_filter:
-                            player_roles = p.get('roles', [])
-                             # "Roam" slot accepts "Roam" or "Support"
-                            if role_filter == "Roam":
-                                if "Roam" not in player_roles and "Support" not in player_roles: continue
-                            else:
-                                if role_filter not in player_roles: continue
-                        
-                        # 2. Build Label
-                        status = t_lookup.get(p.get('current_team_id'), "Free Agent")
-                        if p.get('current_team_id') == sel_team['id']: status = "CURRENT"
-                        roles_str = '/'.join(p.get('roles', []))
-                        label = f"{p['ign']} ({roles_str}) - {status}"
-                        opts[label] = p['id']
-                    return opts
-
-                # Get specific option lists
-                opt_coach = get_options("Coach")
-                opt_dsl   = get_options("Dark Slayer")
-                opt_jgl   = get_options("Jungle")
-                opt_mid   = get_options("Mid")
-                opt_aby   = get_options("Abyssal")
-                opt_roam  = get_options("Roam") # Covers Support too logic above
-                opt_all   = get_options(None)   # For Subs
-
-                # Helper to find index of current ID in a specific options dict
-                def get_idx_in(pid, options_dict):
-                    if not pid: return 0
-                    # The value is the ID. We need to find the key that matches this ID.
-                    # Since we regenerate keys every time (label includes status), exact match might be tricky if status changed?
-                    # But status logic is deterministic based on `current_team_id` vs `sel_team['id']`.
-                    # So iterating list should work.
-                    for i, (l, v) in enumerate(options_dict.items()):
-                        if v == pid: return i
-                    return 0
-
-                curr_r = sel_team.get('roster', {})
-                current_coach_id = sel_team.get('coach_id')
-                
-                with st.form("f_roster_update"):
-                    st.write(f"Editing Roster for: **{sel_t_name}**")
-                    
-                    # 1. COACH ASSIGNMENT
-                    st.markdown("#### 🧠 Coaching Staff")
-                    # Strict Filter: Must have 'Coach' role
-                    new_coach = st.selectbox("Head Coach", list(opt_coach.keys()), index=get_idx_in(current_coach_id, opt_coach))
-                    
-                    st.write("---")
-                    
-                    # 2. MAIN 5
-                    st.markdown("#### ⚔️ Main Roster (Starting 5)")
-                    c1, c2, c3 = st.columns(3)
-                    new_dsl = c1.selectbox("Dark Slayer", list(opt_dsl.keys()), index=get_idx_in(curr_r.get("Dark Slayer"), opt_dsl))
-                    new_jgl = c2.selectbox("Jungle", list(opt_jgl.keys()), index=get_idx_in(curr_r.get("Jungle"), opt_jgl))
-                    new_mid = c3.selectbox("Mid", list(opt_mid.keys()), index=get_idx_in(curr_r.get("Mid"), opt_mid))
-                    
-                    c4, c5 = st.columns(2)
-                    new_aby = c4.selectbox("Abyssal", list(opt_aby.keys()), index=get_idx_in(curr_r.get("Abyssal"), opt_aby))
-                    new_sup = c5.selectbox("Roam (Support)", list(opt_roam.keys()), index=get_idx_in(curr_r.get("Roam"), opt_roam))
-                    
-                    st.write("---")
-                    
-                    # 3. SUBSTITUTES
-                    st.markdown("#### 🔄 Substitutes")
-                    s1, s2 = st.columns(2)
-                    new_sub1 = s1.selectbox("Sub 1", list(opt_all.keys()), index=get_idx_in(curr_r.get("Sub 1"), opt_all))
-                    new_sub2 = s2.selectbox("Sub 2", list(opt_all.keys()), index=get_idx_in(curr_r.get("Sub 2"), opt_all))
-
-                    if st.form_submit_button("💾 Update Roster"):
-                        updated_r = {
-                            "Dark Slayer": opt_dsl[new_dsl],
-                            "Jungle": opt_jgl[new_jgl],
-                            "Mid": opt_mid[new_mid],
-                            "Abyssal": opt_aby[new_aby],
-                            "Roam": opt_roam[new_sup],
-                            "Sub 1": opt_all[new_sub1], 
-                            "Sub 2": opt_all[new_sub2]
-                        }
-                        new_coach_id = opt_coach[new_coach]
-                        
-                        # Sync to DB
-                        batch = db.batch()
-                        t_ref = db.collection('teams').document(sel_team['id'])
-                        
-                        # 1. Update Team Doc
-                        batch.update(t_ref, {
-                            "roster": updated_r,
-                            "coach_id": new_coach_id
-                        })
-                        
-                        # 2. Manage Player "current_team_id"
-                        # Reset old team members
-                        current_members_snap = db.collection('players').where('current_team_id', '==', sel_team['id']).stream()
-                        for p in current_members_snap:
-                            batch.update(p.reference, {"current_team_id": None})
-                            
-                        # Set new members
-                        new_member_ids = [pid for pid in updated_r.values() if pid]
-                        if new_coach_id: new_member_ids.append(new_coach_id)
-                        
-                        for pid in set(new_member_ids):
-                            batch.update(db.collection('players').document(pid), {"current_team_id": sel_team['id']})
-                            
-                        batch.commit()
-                        
-                        # Force refresh session state
-                        st.session_state['teams'] = get_teams()
-                        st.session_state['players'] = get_players()
-                        
-                        st.success("Roster updated successfully!")
-                        time.sleep(0.5)
+                cols = st.columns(6)
+                for i, h in enumerate(valid_heroes):
+                    if cols[i % 6].button(h, key=f"pick_{h}"):
+                        engine.make_move(h)
                         st.rerun()
-
-
-# ==============================================================================
-# MODULE 3: MATCH LOGGER
-# ==============================================================================
-elif menu == "Match Logger":
-    st.title("MATCH LOGGER")
-    
-    if not st.session_state.get('current_version_id'):
-        st.error("Please select a Patch Version in the sidebar first.")
-    else:
-        teams = get_teams()
-        team_names = [t['name'] for t in teams]
-        
-        if len(teams) < 2:
-            st.warning("Need at least 2 teams created in 'Team Roster' to log matches.")
         else:
-            with st.container():
-                st.markdown('<div class="glass-card" style="padding: 20px;">', unsafe_allow_html=True)
-                
-                # STEP 1: PRE-MATCH
-                c1, c2, c3 = st.columns(3)
-                match_type = c1.selectbox("Match Type", ["Scrim", "Tournament", "Ranked"])
-                blue_team_name = c2.selectbox("🔵 Blue Team", team_names, index=0)
-                red_team_name = c3.selectbox("🔴 Red Team", team_names, index=1)
-                
-                st.markdown("---")
-                
-                # STEP 2: DRAFT RECORDER
-                # Fetch heroes for this version
-                heroes_df = get_heroes(st.session_state['current_version_id'])
-                if heroes_df.empty:
-                    st.error("No heroes found in this version.")
-                else:
-                    hero_options = heroes_df['name'].tolist()
-                    
-                    col_b, col_r = st.columns(2)
-                    
-                    with col_b:
-                        st.info("Blue Side Draft")
-                        b_bans = st.multiselect("Blue Bans (4)", hero_options, max_selections=4, key="bb")
-                        b_picks = st.multiselect("Blue Picks (5)", hero_options, max_selections=5, key="bp")
-                        
-                    with col_r:
-                        st.error("Red Side Draft")
-                        r_bans = st.multiselect("Red Bans (4)", hero_options, max_selections=4, key="rb")
-                        r_picks = st.multiselect("Red Picks (5)", hero_options, max_selections=5, key="rp")
-                        
-                    st.markdown("---")
-                    
-                    # STEP 3: RESULT
-                    winner = st.radio("Winner", ["Blue", "Red"], horizontal=True)
-                    notes = st.text_area("Match Notes")
-                    
-                    if st.button("📝 Log Match Result", use_container_width=True):
-                         # Find Team IDs & Rosters
-                        b_team = next((t for t in teams if t['name'] == blue_team_name), None)
-                        r_team = next((t for t in teams if t['name'] == red_team_name), None)
-                        
-                        b_id = b_team['id'] if b_team else None
-                        r_id = r_team['id'] if r_team else None
-                        
-                        # Snapshot rosters (Player IDs present at this time)
-                        b_roster = b_team.get('roster', {}) if b_team else {}
-                        r_roster = r_team.get('roster', {}) if r_team else {}
-                        
-                        match_doc = {
-                            "version_id": st.session_state['current_version_id'],
-                            "type": match_type,
-                            "blue_team_id": b_id,
-                            "red_team_id": r_id,
-                            "blue_roster_snapshot": b_roster, # Relational Link
-                            "red_roster_snapshot": r_roster,   # Relational Link
-                            "blue_bans": b_bans,
-                            "blue_picks": b_picks,
-                            "red_bans": r_bans,
-                            "red_picks": r_picks,
-                            "winner": winner,
-                            "timestamp": datetime.now(),
-                            "notes": notes
-                        }
-                        
-                        db.collection('matches').add(match_doc)
-                        st.success("Match Logged to Database!")
-                        st.balloons()
-
-                st.markdown('</div>', unsafe_allow_html=True)
+             # Bot Turn
+             st.info(f"🤖 Bot ({side_text}) is thinking...")
+             time.sleep(0.7)
+             engine.auto_bot_move(all_hero_names)
+             st.rerun()
 
 # ==============================================================================
-# MODULE 4: DRAFT SIMULATOR & ANALYTICS
+# MAIN PAGE ROUTER
 # ==============================================================================
-elif menu == "Draft Simulator":
-    st.title("SIMULATION & ANALYTICS")
-    
-    mode = st.selectbox("Mode", ["Analytics Dashboard", "Bot vs Bot Simulation"])
-    
-    if mode == "Analytics Dashboard":
-        st.subheader("Meta Analytics")
-        # Query matches for current version
-        if st.session_state.get('current_version_id'):
-            matches = db.collection('matches').where('version_id', '==', st.session_state['current_version_id']).stream()
-            
-            # Simple aggregations
-            pick_counts = {}
-            ban_counts = {}
-            wins = {}
-            total_matches = 0
-            
-            for m in matches:
-                d = m.to_dict()
-                total_matches += 1
-                winner = d.get('winner')
-                
-                # Picks
-                for p in d.get('blue_picks', []):
-                    pick_counts[p] = pick_counts.get(p, 0) + 1
-                    if winner == "Blue": wins[p] = wins.get(p, 0) + 1
-                    
-                for p in d.get('red_picks', []):
-                    pick_counts[p] = pick_counts.get(p, 0) + 1
-                    if winner == "Red": wins[p] = wins.get(p, 0) + 1
-                
-                # Bans
-                for b in d.get('blue_bans', []) + d.get('red_bans', []):
-                    ban_counts[b] = ban_counts.get(b, 0) + 1
-            
-            if total_matches > 0:
-                stats = []
-                all_heroes = set(list(pick_counts.keys()) + list(ban_counts.keys()))
-                for h in all_heroes:
-                    p = pick_counts.get(h, 0)
-                    b = ban_counts.get(h, 0)
-                    w = wins.get(h, 0)
-                    wr = (w / p * 100) if p > 0 else 0
-                    stats.append({
-                        "Hero": h,
-                        "Pick Rate": f"{(p/total_matches*100):.1f}%",
-                        "Ban Rate": f"{(b/total_matches*100):.1f}%",
-                        "Win Rate": f"{wr:.1f}%",
-                        "Matches": p
-                    })
-                
-                st.dataframe(pd.DataFrame(stats).sort_values("Matches", ascending=False), use_container_width=True)
-            else:
-                st.info("No matches recorded for this patch version yet.")
-        else:
-             st.warning("Select a version.")
 
-    elif mode == "Bot vs Bot Simulation":
-        st.subheader("Monte Carlo Draft Sim")
-        st.caption("Simulates 100 matches based on Meta Scores to predict outcomes.")
+# Sidebar
+with st.sidebar:
+    st.markdown("# second-brain-core 🧠")
+    
+    # Refresh Button
+    if st.button("🔄", type="primary", use_container_width=True, help="Refresh data from Google Sheets"):
+        st.cache_data.clear()
+        st.toast("Data refreshed from Google Sheets!", icon="✅")
+        time.sleep(1)
+        st.rerun()
+
+    st.markdown("---")
+    
+    # Version Selector
+    all_versions = db.get_all_versions()
+    if not all_versions:
+        # Fallback if no sheets exist/configured wrong
+        all_versions = ["VERSION 1.60.1.10"]
+
+    # Initialize Session State for Version
+    if 'current_version' not in st.session_state:
+        st.session_state['current_version'] = all_versions[0]
         
-        if st.button("Run Simulation"):
-             with st.spinner("Simulating..."):
-                 time.sleep(2) # Fake compute time for UX
-                 st.success("Simulation Complete")
-                 st.metric("Predicted Blue Win Rate", "54%", "+2.3%")
-                 st.progress(54)
+    # Ensure selected version is valid
+    if st.session_state['current_version'] not in all_versions:
+         st.session_state['current_version'] = all_versions[0]
+
+    selected_ver = st.selectbox(
+        "Current Patch", 
+        all_versions, 
+        index=all_versions.index(st.session_state['current_version'])
+    )
+    
+    # Update state if changed
+    if selected_ver != st.session_state['current_version']:
+        st.session_state['current_version'] = selected_ver
+        st.rerun()
+
+    st.markdown("---")
+    
+    # --- SIDEBAR NAVIGATION ---
+    st.markdown("### 🧭 Navigation")
+    selected_page = st.radio(
+        "Go to:", 
+        ["Hero Database", "Player Manager", "Team Builder", "Draft Simulator", "Synergy Builder", "Version Control"],
+        index=0
+    )
+    st.markdown("---")
+    
+    # Reset Editor State if leaving Hero Database
+    if selected_page != "Hero Database":
+         st.session_state['show_editor'] = False
+
+# Main Content Router
+try:
+    if selected_page == "Hero Database":
+        if st.session_state.get('show_editor', False):
+             render_hero_editor_ui()
+        else:
+             render_hero_grid_page(st.session_state['current_version'])
+             
+    elif selected_page == "Player Manager":
+        render_player_manager()
+        
+    elif selected_page == "Team Builder":
+        render_team_builder()
+    
+    elif selected_page == "Draft Simulator":
+        render_draft_simulator()
+        
+    elif selected_page == "Synergy Builder":
+        st.header("Synergy Builder (Coming Soon)")
+        st.info("Logic for Synergy Builder will be implemented here.")
+        
+    elif selected_page == "Version Control":
+        render_version_control_ui()
+        
+except Exception as e:
+    st.error(f"Application Error: {e}")
+    st.exception(e)
