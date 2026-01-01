@@ -3,3 +3,4 @@ firebase-admin
 cloudinary
 pandas
 openpyxl
+st-gsheets-connection
